@@ -5,7 +5,7 @@ import numpy as np
 class MinesweeperState:
     def __init__(self, shape, mines, start=None):
         self.revealed = np.zeros(shape, dtype=bool)
-        self.values = np.zeros(shape, dtype=np.int8)
+        self.neighboring_mines = np.zeros(shape, dtype=np.int8)
         self.mines = mines
 
         
@@ -23,9 +23,12 @@ class MinesweeperState:
             for i in [-1, 0, 1]:
                 for j in [-1, 0, 1]:
                     neighbor = (index[0] + i, index[1] + j)
-                    if index != neighbor and 0 <= neighbor[0] < shape[0] and 0 <= neighbor[1] < shape[1]:
-                        if self.values[neighbor] >= 0:
-                            self.values[neighbor] += 1
+                    if index != neighbor:
+                        try:
+                            if self.values[neighbor] >= 0:
+                                self.values[neighbor] += 1
+                        except IndexError:
+                            continue
 
     def reveal(self, x, y):
         self.revealed[(x,y)] = True
