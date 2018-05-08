@@ -6,19 +6,18 @@ from PIL import Image, ImageDraw
 CELL = 16
 BORDER = 10
 WIDTH = 2
+COLORS = ["#0000FF", "#008200", "#FF0000", "#000084", "#840000", "#008284", "#840084", "#000000"]
 
 class MinesweeperState:
     def __init__(self, shape, mines, start=None):
         self.covered = np.ones(shape, dtype=bool)
         self.adjacent_mines = np.zeros(shape, dtype=np.int8)
         self.mine_count = mines
-        self._init_image(shape)
 
         indices = [tuple(index) for index in np.ndindex(shape)]
         if start:
             self.covered[start] = False
             indices.remove(start)
-            self._draw_cell(start)
 
         # initialize mines
         assert mines < len(indices)
@@ -37,6 +36,11 @@ class MinesweeperState:
                                 self.adjacent_mines[neighbor] += 1
                         except IndexError:
                             continue
+
+        # create graphics for board state
+        self._init_image(shape)
+        if start:
+            self._draw_cell(start)
 
     def _init_image(self, shape):
         # create image and draw background
@@ -68,29 +72,50 @@ class MinesweeperState:
         self.drawer.line(black_path, fill="#7B7B7B", width=WIDTH)
 
     def reveal(self, pos):
+        assert self.covered[pos]
         self._draw_cell(pos) # alter image
         self.covered[pos] = False
-        return self.neighboring_mines[pos]
+        return self.adjacent_mines[pos]
 
     def is_goal(self):
         return self.covered.sum() == self.mine_count
 
     def _draw_cell(self, pos):
         # draw covered cell
-        val = self.neighboring_mines[pos]
+        cell_border = (CELL*pos[0] + BORDER + WIDTH, CELL*pos[1] + BORDER + WIDTH, CELL*pos[0] + BORDER + CELL, CELL*pos[1] + BORDER + CELL)
+        self.drawer.rectangle(cell_border, fill="#BDBDBD")
+        val = self.adjacent_mines[pos]
         if val > 0:
-            pass # draw text
+            text_size = self.drawer.textsize(str(val))
+            text_anchor = (cell_border[0] + (CELL - text_size[0]) / 2, cell_border[1] + (CELL - text_size[1]) / 2)
+            self.drawer.text(text_anchor, str(val), fill=COLORS[val - 1], align="center")
         elif val < 0:
-            pass # draw mine
+            self.drawer.ellipse(cell_border, fill="#000000")
 
     def to_image(self, dest):
         self.image.save(dest)
 
 
 def test_state():
-    shape = (20, 16)
-    test = MinesweeperState(shape, 100)
-    test.to_image('test_image_1.png')
+    shape = (10, 8)
+    test = MinesweeperState(shape, 10)
+    test.to_image('test_image_init.png')
+    assert (test.adjacent_mines < 0).sum() == 10
+
+    test = MinesweeperState(shape, 25, start=(5,4))
+    test.to_image('test_image_reveal.png')
+    print test.adjacent_mines.T
+    print test.adjacent_mines[(5,4)]
+
+    for i in range(5):
+        pos = (random.randint(0, shape[0]-1), random.randint(0, shape[1]-1))
+        while not test.covered[pos]:
+            pos = (random.randint(0, shape[0]-1), random.randint(0, shape[1]-1))
+        
+        val = test.reveal(pos)
+        test.to_image("test_image_%d.png" % (i + 1))
+        print test.covered.T
+        print val
 
 
 if __name__ == '__main__':
