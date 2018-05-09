@@ -8,8 +8,9 @@ BORDER = 10
 WIDTH = 2
 COLORS = ["#0000FF", "#008200", "#FF0000", "#000084", "#840000", "#008284", "#840084", "#000000"]
 
+# config for initial state and whether to render board
 class MinesweeperState:
-    def __init__(self, shape, mines, start=None):
+    def __init__(self, shape, mines, start=None, render=False):
         self.covered = np.ones(shape, dtype=bool)
         self.adjacent_mines = np.zeros(shape, dtype=np.int8)
         self.mine_count = mines
@@ -38,9 +39,11 @@ class MinesweeperState:
                             continue
 
         # create graphics for board state
-        self._init_image(shape)
-        if start:
-            self._draw_cell(start)
+        self.render = render
+        if self.render:
+            self._init_image(shape)
+            if start:
+                self._draw_cell(start)
 
     def _init_image(self, shape):
         # create image and draw background
@@ -73,7 +76,9 @@ class MinesweeperState:
 
     def reveal(self, pos):
         assert self.covered[pos]
-        self._draw_cell(pos) # alter image
+        if self.render:
+            self._draw_cell(pos) # alter image
+
         self.covered[pos] = False
         return self.adjacent_mines[pos]
 
@@ -90,19 +95,29 @@ class MinesweeperState:
             text_anchor = (cell_border[0] + (CELL - text_size[0]) / 2, cell_border[1] + (CELL - text_size[1]) / 2)
             self.drawer.text(text_anchor, str(val), fill=COLORS[val - 1], align="center")
         elif val < 0:
-            self.drawer.ellipse(cell_border, fill="#000000")
+            # draw a nice mine
+            mine_border = (cell_border[0] + 3, cell_border[1] + 3, cell_border[2] - 3, cell_border[3] - 3)
+            self.drawer.ellipse(mine_border, fill="#000000")
+            self.drawer.line(mine_border, fill="#000000")
+            self.drawer.line((mine_border[0], mine_border[1] + 8, mine_border[2], mine_border[3] - 8), fill="#000000")
+            self.drawer.line((mine_border[0] - 2, mine_border[1] + 4, mine_border[2] + 2, mine_border[3] - 4), fill="#000000")
+            self.drawer.line((mine_border[0] + 4, mine_border[1] - 2, mine_border[2] - 4, mine_border[3] + 2), fill="#000000")
+            self.drawer.rectangle((cell_border[0] + 5, cell_border[1] + 5, cell_border[0] + 6, cell_border[1] + 6), fill="#FFFFFF")
 
     def to_image(self, dest):
+        if not self.render:
+            raise RuntimeError("Graphics rendering option is disabled")
+
         self.image.save(dest)
 
 
 def test_state():
     shape = (10, 8)
-    test = MinesweeperState(shape, 10)
+    test = MinesweeperState(shape, 10, render=True)
     test.to_image('test_image_init.png')
     assert (test.adjacent_mines < 0).sum() == 10
 
-    test = MinesweeperState(shape, 25, start=(5,4))
+    test = MinesweeperState(shape, 25, start=(5,4), render=True)
     test.to_image('test_image_reveal.png')
     print test.adjacent_mines.T
     print test.adjacent_mines[(5,4)]
