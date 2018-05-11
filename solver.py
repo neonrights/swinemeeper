@@ -1,13 +1,14 @@
 import os
-import copy
+import collections
 import numpy as np
 
 from state import MinesweeperState
+import pdb
 
 
-class MinesweeperSolver:
+class MinesweeperSolver(object):
     def __init__(self, shape, mines, start=None, name='solver'):
-        self.board = MinesweeperState(shape, mines, start)
+        self.board = MinesweeperState(shape, mines, start, render=True)
         self.move = 1 if start else 0
         self.name = name
         # other shared variables, like remaining mines
@@ -17,8 +18,8 @@ class MinesweeperSolver:
         # determine if game s over
         raise NotImplementedError
 
-    def save_state(self, path):
-        self.board.to_image(os.path.join(path, self.name, "board_%d" $ self.move))
+    def save_state(self):
+        self.board.to_image("board_%d.png" % self.move)
 
 
 class PlayerSolver(MinesweeperSolver):
@@ -39,12 +40,12 @@ class CSPSolver(MinesweeperSolver):
         self.known_mines = set() # set of known mines
 
         # initialize constraint list
-        all_variables = set([tuple(index) for index in np.ndindex(shape)])
+        all_variables = set(tuple(index) for index in np.ndindex(shape))
         self.constraints = [[all_variables, mines]]
         # add dictionary for faster constraint pruning
-        #self.var_dict = dict()
-        #for var in all_variables:
-        #    self.var_dict[var] = set([copy.copy(self.constraints[0])])
+        self.var_dict = dict()
+        for var in all_variables:
+            self.var_dict[var] = [self.constraints[0]]
 
         if start:
             self._add_constraint(start)
@@ -52,19 +53,19 @@ class CSPSolver(MinesweeperSolver):
     def _add_constraint(self, position):
         # determine unknown neighbors
         constraint_vars = set()
-        assert self.board.revealed[position]
-        constraint_val = self.board.neighboring_mines[position]
+        assert not self.board.covered[position]
+        constraint_val = self.board.adjacent_mines[position]
         for i in [-1, 0, 1]:
             for j in [-1, 0, 1]:
                 neighbor = (position[0] + i, position[1] + j)
                 if neighbor != position:
                     try:
-                        if not self.board.revealed[neighbor]:
-                            constraint_var.add(neighbor)
+                        if self.board.covered[neighbor]:
+                            constraint_vars.add(neighbor)
                     except IndexError:
                         continue
 
-        if not contraint_vars:
+        if not constraint_vars:
             assert constraint_val == 0
             return # no variables in constraint, no need to add
 
@@ -73,27 +74,39 @@ class CSPSolver(MinesweeperSolver):
         constraint_vars = constraint_vars.difference(self.known_mines)
         assert constraint_val >= 0
 
-        prune_mines = set()
-        prune_safe = set()
+        resolved_constraints = collections.deque()
         if constraint_val == 0:
-            # prune safe variables
-            prune_safe = constraint_vars
+            resolved_constraints.append([constraint_vars, constraint_val])
+            self.save_moves = self.safe_moves.union(constraint_vars)
         elif len(constraint_vars) == constraint_val:
             # prune known mines
-            prune_mines = constraint_vars
-            self.known_mines.union(constraint_vars)
-        else:
-            self.constraints.append([constraint_vars, constraint_val])
-            return # constraint not resolved, add to list
+            resolved_constraints.append([constraint_vars, constraint_val])
+            self.known_mines = self.known_mines.union(constraint_vars)
 
-        # continue while there are still variables to prune
-        while not prune_mines and not prune_safe:
-            new_safe = set()
-            new_mines = set()
+        # constraint not resolved, prune sets where new constraint contains subset of variables
+        if not resolved_constraints:
             for i in range(len(self.constraints)):
-                self.constraints[i][0] = self.constraints[i][0].difference(prune_safe)
-                self.constraints[i][1] -= len(self.constraints[i][0].intersection(prune_mines))
-                self.constraints[i][0] = self.constraints[i][0].difference(prune_mines)
+                if self.constraints[i][0].issuperset(constraint_vars):
+                    self.constraints[i][0] = self.constraints[i][0].difference(constraint_vars)
+                    self.constraints[i][1] -= constraint_val
+                    # check if constraint has been resolved
+                elif self.constraints[i][0].issubset(constraint_vars):
+                    break # edit constraint variables, see if resolved
+                    # if resolved, add to resolved list and break?
+                    # if not continue? restart? with new constraints
+
+            if not resolved_constraints:
+                return # no more constraints to prune
+        
+        # continue while there are still variables to prune
+        while not resolved_constraints:
+            constraint_vars, constraint_val = resolved_constraints.popleft()
+            for i in range(len(self.constraints)):
+                if constraint_val == 0:
+                    self.constraints[i][0] = self.constraints[i][0].difference(constraint_vars)
+                else:
+                    self.constraints[i][1] -= len(self.constraints[i][0].intersection(constraint_vars))
+                    self.constraints[i][0] = self.constraints[i][0].difference(constraint_vars)
 
                 if not self.constraints[i][0]:
                     assert self.constraints[i][1] == 0
@@ -102,15 +115,16 @@ class CSPSolver(MinesweeperSolver):
 
                 # if constraint is satisfied, add new variables to list
                 if self.constraints[i][1] == 0:
-                    new_safe = new_safe.union(self.constraints[i][0])
+                    resolved_constraints.append(self.constraints[i])
                     del self.constraints[i]
-                elif self.constraints[i][0]) == self.constraints[i][1]:
-                    new_mines = new_mines.union(self.constraints[i][0])
+                elif self.constraints[i][0] == self.constraints[i][1]:
+                    resolved_constraints.append(self.constraints[i])
                     self.known_mines = self.known_mines.union(self.constraints[i][0])
                     del self.constraints[i]
 
-            prune_mines = new_mines
-            prune_safe = new_safe
+
+
+
 
     def _calculate_probabilities(self):
         raise NotImplementedError
@@ -138,7 +152,14 @@ class CSPSolver(MinesweeperSolver):
 
 
 def test_cps():
-    raise NotImplementedError
+    test_solver = CSPSolver((20, 16), 100)
+    assert test_solver.constraints[0][1] == 100
+    assert len(test_solver.constraints[0][0]) == 20*16
+    test_solver.save_state()
+
+    test_solver = CSPSolver((20, 16), 100, start=(5,4))
+    test_solver.save_state()
+    pdb.set_trace()
     # test initialization
     # test constraint addition
     # test probability calculation
