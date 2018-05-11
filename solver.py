@@ -72,15 +72,14 @@ class CSPSolver(MinesweeperSolver):
 
         new_constraints = collections.deque()
         new_constraints.append(set([position]), 0) # prune newly revealed space
-        if not constraint_vars:
-            assert constraint_val == 0
+        if constraint_vars:
             new_constraints.append([constraint_vars, constraint_val]) # prune 
             if constraint_val == 0:
                 self.save_moves = self.safe_moves.union(constraint_vars)
             elif len(constraint_vars) == constraint_val:
                 self.known_mines = self.known_mines.union(constraint_vars)
         
-        # continue while there are still variables to prune
+        # continue while there are still newly formed constraints
         while not new_constraints:
             constraint_vars, constraint_val = new_constraints.popleft()
             for i in range(len(self.constraints)):
@@ -99,7 +98,9 @@ class CSPSolver(MinesweeperSolver):
                         self.constraints[i][1] -= constraint_val
                     elif self.constraints[i][0].issubset(constraint_vars):
                         # old constraint is subset of new constraint
-                        new_constraints.append
+                        new_vars = constraint_vars.difference(self.constraints[i][0])
+                        new_val = constraint_val - self.constraints[i][1]
+                        new_constraints.append(new_vars, new_val)
                         # edit constraint variables, see if resolved
                         # if resolved, add to resolved list and break?
                         # if not continue? restart? with new constraints
