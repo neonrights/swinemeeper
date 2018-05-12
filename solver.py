@@ -71,13 +71,9 @@ class CSPSolver(MinesweeperSolver):
         assert constraint_val >= 0
 
         new_constraints = collections.deque()
-        new_constraints.append(set([position]), 0) # prune newly revealed space
+        new_constraints.append([set([position]), 0]) # prune newly revealed space
         if constraint_vars:
-            new_constraints.append([constraint_vars, constraint_val]) # prune 
-            if constraint_val == 0:
-                self.save_moves = self.safe_moves.union(constraint_vars)
-            elif len(constraint_vars) == constraint_val:
-                self.known_mines = self.known_mines.union(constraint_vars)
+            new_constraints.append([constraint_vars, constraint_val]) # prune
         
         # continue while there are still newly formed constraints
         while not new_constraints:
@@ -100,15 +96,12 @@ class CSPSolver(MinesweeperSolver):
                         # old constraint is subset of new constraint
                         new_vars = constraint_vars.difference(self.constraints[i][0])
                         new_val = constraint_val - self.constraints[i][1]
-                        new_constraints.append(new_vars, new_val)
-                        # edit constraint variables, see if resolved
-                        # if resolved, add to resolved list and break?
-                        # if not continue? restart? with new constraints
+                        new_constraints.append([new_vars, new_val])
+                        continue # skip remaining? must not add unaltered constraint
 
                 if not self.constraints[i][0]:
                     assert self.constraints[i][1] == 0
                     del self.constraints[i] # empty constraint, remove
-                    continue
 
                 # if constraint is resolved, add new variables to list
                 if self.constraints[i][1] == 0:
@@ -119,8 +112,12 @@ class CSPSolver(MinesweeperSolver):
                     self.known_mines = self.known_mines.union(self.constraints[i][0])
                     del self.constraints[i]
 
-            if constraint_val == 0 or len(constraint_vars) == constraint_val:
-                # add constraint if not resolved, not altered, and not repeat
+            # add constraint if not resolved, otherwise add to known mines or safe moves
+            if constraint_val == 0:
+                self.save_moves = self.safe_moves.union(constraint_vars)
+            elif len(constraint_vars) == constraint_val:
+                self.known_mines = self.known_mines.union(constraint_vars)
+            else:
                 self.constraints.append([constraint_vars, constraint_val])
 
     def _calculate_probabilities(self):
