@@ -17,7 +17,7 @@ def info(type, value, tb):
 
 def assert_debugger(function):
     def wrapper(*args, **kwargs):
-        print "Started Test Debugger"
+        print "Started Test Debugger\n"
         sys.excepthook = info
         function(*args, **kwargs)
 

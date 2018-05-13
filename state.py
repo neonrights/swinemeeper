@@ -31,12 +31,9 @@ class MinesweeperState:
             for i in [-1, 0, 1]:
                 for j in [-1, 0, 1]:
                     neighbor = (index[0] + i, index[1] + j)
-                    if index != neighbor:
-                        try:
-                            if self.adjacent_mines[neighbor] >= 0:
-                                self.adjacent_mines[neighbor] += 1
-                        except IndexError:
-                            continue
+                    if 0 <= neighbor[0] < shape[0] and 0 <= neighbor[1] < shape[1]:
+                        if neighbor != index and self.adjacent_mines[neighbor] >= 0:
+                            self.adjacent_mines[neighbor] += 1
 
         # create graphics for board state
         self.render = render
@@ -75,7 +72,7 @@ class MinesweeperState:
         self.drawer.line(black_path, fill="#7B7B7B", width=WIDTH)
 
     def reveal(self, pos):
-        assert self.covered[pos]
+        assert self.covered[pos], "chosen position has already been uncovered"
         if self.render:
             self._draw_cell(pos) # alter image
 

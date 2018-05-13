@@ -1,8 +1,10 @@
 import os
+import sys
 import collections
 import numpy as np
 
 from state import MinesweeperState
+from debugger import assert_debugger
 import pdb
 
 
@@ -19,7 +21,10 @@ class MinesweeperSolver(object):
         raise NotImplementedError
 
     def save_state(self):
-        self.board.to_image("board_%d.png" % self.move)
+        if not os.path.exists("images"):
+            os.mkdir("images")
+
+        self.board.to_image("images/board_%d.png" % self.move)
 
 
 class PlayerSolver(MinesweeperSolver):
@@ -51,24 +56,23 @@ class CSPSolver(MinesweeperSolver):
             self._add_constraint(start)
 
     def _add_constraint(self, position):
+        if self.board.covered[position]:
+            pdb.set_trace()
+
         # determine unknown neighbors
         constraint_vars = set()
-        assert not self.board.covered[position]
         constraint_val = self.board.adjacent_mines[position]
         for i in [-1, 0, 1]:
             for j in [-1, 0, 1]:
                 neighbor = (position[0] + i, position[1] + j)
-                if neighbor != position:
-                    try:
-                        if self.board.covered[neighbor]:
-                            constraint_vars.add(neighbor)
-                    except IndexError:
-                        continue
+                if 0 <= neighbor[0] < self.board.covered.shape[0] and 0 <= neighbor[1] < self.board.covered.shape[1]:
+                    if neighbor != position and self.board.covered[neighbor]:
+                        constraint_vars.add(neighbor)
 
         # remove known mines from constraint, update constraint
         constraint_val -= len(constraint_vars.intersection(self.known_mines))
-        constraint_vars = constraint_vars.difference(self.known_mines)
-        assert constraint_val >= 0
+        constraint_vars -= self.known_mines
+        assert constraint_val >= 0, "invalid constraint value after pruning known mines"
 
         new_constraints = collections.deque()
         new_constraints.append([set([position]), 0]) # prune newly revealed space
@@ -76,21 +80,22 @@ class CSPSolver(MinesweeperSolver):
             new_constraints.append([constraint_vars, constraint_val]) # prune
         
         # continue while there are still newly formed constraints
-        while not new_constraints:
+        while new_constraints:
             constraint_vars, constraint_val = new_constraints.popleft()
+            delete_set = set()
             for i in range(len(self.constraints)):
                 if constraint_val == 0:
                     # resolved constraint, all safe
-                    self.constraints[i][0] = self.constraints[i][0].difference(constraint_vars)
+                    self.constraints[i][0] -= constraint_vars
                 elif len(constraint_vars) == constraint_val:
                     # resolved constraint, all mines
                     self.constraints[i][1] -= len(self.constraints[i][0].intersection(constraint_vars))
-                    self.constraints[i][0] = self.constraints[i][0].difference(constraint_vars)
+                    self.constraints[i][0] -= constraint_vars
                 else:
                     # unresolved constraint
                     if self.constraints[i][0].issuperset(constraint_vars):
                         # new constraint is subset of old constraint
-                        self.constraints[i][0] = self.constraints[i][0].difference(constraint_vars)
+                        self.constraints[i][0] -= constraint_vars
                         self.constraints[i][1] -= constraint_val
                     elif self.constraints[i][0].issubset(constraint_vars):
                         # old constraint is subset of new constraint
@@ -100,64 +105,75 @@ class CSPSolver(MinesweeperSolver):
                         continue # skip remaining? must not add unaltered constraint
 
                 if not self.constraints[i][0]:
-                    assert self.constraints[i][1] == 0
-                    del self.constraints[i] # empty constraint, remove
+                    assert self.constraints[i][1] == 0, "constraint has no variables but value is not 0"
+                    delete_set.add(i) # empty constraint, remove
 
                 # if constraint is resolved, add new variables to list
                 if self.constraints[i][1] == 0:
                     new_constraints.append(self.constraints[i])
-                    del self.constraints[i]
-                elif self.constraints[i][0] == self.constraints[i][1]:
+                    self.safe_moves = self.safe_moves.union(self.constraints[i][0])
+                    delete_set.add(i)
+                elif len(self.constraints[i][0]) == self.constraints[i][1]:
                     new_constraints.append(self.constraints[i])
                     self.known_mines = self.known_mines.union(self.constraints[i][0])
-                    del self.constraints[i]
+                    delete_set.add(i)
+
+            for i in sorted(delete_set, reverse=True):
+                del self.constraints[i]
 
             # add constraint if not resolved, otherwise add to known mines or safe moves
             if constraint_val == 0:
-                self.save_moves = self.safe_moves.union(constraint_vars)
+                for move in constraint_vars:
+                    if self.board.covered[move]:
+                        self.safe_moves.add(move)
             elif len(constraint_vars) == constraint_val:
                 self.known_mines = self.known_mines.union(constraint_vars)
-            else:
+            elif constraint_vars:
                 self.constraints.append([constraint_vars, constraint_val])
 
     def _calculate_probabilities(self):
         raise NotImplementedError
-        # calculate the probability of a space containing a mine using constraint list
-        # exception for first constraint, will stay until game is over
-        #   calculation is easy as it is val / |vars|
-        # figure out how to calculate probs for other constraints
         # get unknown variables
-        # perform dfs on unknown using constraint list as conditional
+        # split unknown variables into disjoint sets and constraints
+        # perform dfs with backtracking on each set of variables and constraints
+        # get probabilities, add safe moves if any become available
+        # return min probability space
 
     def _satisfies_constraints(self, vars, vals):
-        raise NotImplementedError # returns true if variable-value pairs satisfy constraints
+        raise NotImplementedError # returns true if variable-value pairs are satisfied
 
     def act(self):
         # view constraint list, determine which space to choose
-        if self.safe.isEmpty():
-            self._calculate_probabilities()
-            # return position of variable with min prob
+        self.move += 1
+        if self.safe_moves:
+            pos = self.safe_moves.pop()
         else:
-            pos = self.safe.pop()
+            pos = self._calculate_probabilities()
 
         val = self.board.reveal(pos)
-        assert val >= 0
-        self._add_constraint(pos)
+        if val >= 0:
+            self._add_constraint(pos)
+
+        return val
 
 
+@assert_debugger
 def test_cps():
     test_solver = CSPSolver((20, 16), 100)
     assert test_solver.constraints[0][1] == 100
     assert len(test_solver.constraints[0][0]) == 20*16
     test_solver.save_state()
 
-    test_solver = CSPSolver((20, 16), 100, start=(5,4))
+    test_solver = CSPSolver((20, 20), 40, start=(5,4))
+    assert len(test_solver.constraints[0][0]) == (20**2 - 9), "improper pruning"
     test_solver.save_state()
+    while True:
+        try:
+            test_solver.act()
+            test_solver.save_state()
+        except NotImplementedError:
+            break
     pdb.set_trace()
-    # test initialization
-    # test constraint addition
-    # test probability calculation
-    # test act/decision function
 
 
 if __name__ == '__main__':
