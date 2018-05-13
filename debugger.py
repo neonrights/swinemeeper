@@ -15,7 +15,7 @@ def info(type, value, tb):
         # ...then start the debugger in post-mortem mode.
         pdb.pm()
 
-def assert_debugger(function):
+def exception_debugger(function):
     def wrapper(*args, **kwargs):
         print "Started Test Debugger\n"
         sys.excepthook = info

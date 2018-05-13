@@ -157,7 +157,7 @@ class CSPSolver(MinesweeperSolver):
         return val
 
 
-@assert_debugger
+@exception_debugger
 def test_cps():
     test_solver = CSPSolver((20, 16), 100)
     assert test_solver.constraints[0][1] == 100
