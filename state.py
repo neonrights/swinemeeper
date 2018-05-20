@@ -116,8 +116,8 @@ def test_state():
 
     test = MinesweeperState(shape, 25, start=(5,4), render=True)
     test.to_image('test_image_reveal.png')
-    print test.adjacent_mines.T
-    print test.adjacent_mines[(5,4)]
+    print(test.adjacent_mines.T)
+    print(test.adjacent_mines[(5,4)])
 
     for i in range(5):
         pos = (random.randint(0, shape[0]-1), random.randint(0, shape[1]-1))
@@ -126,8 +126,8 @@ def test_state():
         
         val = test.reveal(pos)
         test.to_image("test_image_%d.png" % (i + 1))
-        print test.covered.T
-        print val
+        print(test.covered.T)
+        print(val)
 
 
 if __name__ == '__main__':
