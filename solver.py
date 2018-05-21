@@ -1,6 +1,7 @@
 import os
 import sys
 import random
+import operator
 import numpy as np
 
 from collections import deque
@@ -139,7 +140,7 @@ class CSPSolver(MinesweeperSolver):
 		remaining_variables -= self.known_mines
 		remaining_variables -= self.safe_moves
 
-		# split unknown variables into disjoint sets and constraints
+		# split unknown variables into disjoint sets of variables and constraints
 		disjoint_sets = list()
 		while remaining_variables:
 			var = remaining_variables.pop()
@@ -157,12 +158,28 @@ class CSPSolver(MinesweeperSolver):
 			# check if single constraint
 			if len(constraints) == 1:
 				assert self.constraints[0][1] > 0, "uncaught resolved constraint"
-				# must be a crapshoot, resolve immediately
-				return tuple(random.sample(constraints[0][0], 1))
+				# determine if crapshoot, if so, guess immediately
+				prob = float(constraints[0][1]) / len(constrains[0][0])
+				for var in constraint[0][0]:
+					probabilities[var] = prob
 			else:
-			# reorder constraints 
+				# do initial ordering of variables by number of constraints they appear in
+				constraint_counts = dict()
+				for constraint in constraints:
+					for var in constraint[0]:
+						try:
+							constraint_counts[var] += 1
+						except KeyError:
+							constraint_counts[var] = 1
 
-			# perform dfs
+				sorted_vars = sorted(constraint_counts.items(), key=operator.itemgetter(1), reverse=True)
+				# perform dfs
+
+		# sort dictionary by values, min to max
+		# for every 0 add to safe spaces
+		# for every 1 add to known mines
+		# if known mines or safe spaces, edit constraints
+		# if no safe spaces, return random min prob
 
 	def _satisfies_constraints(self, vars, vals):
 		raise NotImplementedError # returns true if variable-value pairs are satisfied
