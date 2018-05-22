@@ -7,7 +7,7 @@ import numpy as np
 from collections import deque
 
 from state import MinesweeperState
-from debugger import assert_debugger
+from debugger import exception_debugger
 
 
 class MinesweeperSolver(object):
@@ -40,9 +40,6 @@ class PlayerSolver(MinesweeperSolver):
 class CSPSolver(MinesweeperSolver):
 	def __init__(self, shape, mines, start=None, name='csp'):
 		super(CSPSolver, self).__init__(shape, mines, start)
-		# initialize variable/probability tracker
-		self.probs = np.zeros(shape) + 10 # < 0 for unknown
-
 		self.safe_moves = set() # set of safe spaces for fast moves
 		self.known_mines = set() # set of known mines
 
@@ -57,9 +54,8 @@ class CSPSolver(MinesweeperSolver):
 		if start:
 			self._add_constraint(start)
 
-	def _add_constraint(self, position):
-		assert self.board.covered[position]
 
+	def _add_constraint(self, position):
 		# determine unknown neighbors
 		constraint_vars = set()
 		constraint_val = self.board.adjacent_mines[position]
@@ -84,39 +80,39 @@ class CSPSolver(MinesweeperSolver):
 		while new_constraints:
 			constraint_vars, constraint_val = new_constraints.popleft()
 			delete_set = set()
-			for i in range(len(self.constraints)):
+			for i, constraint in enumerate(self.constraints):
 				if constraint_val == 0:
 					# resolved constraint, all safe
-					self.constraints[i][0] -= constraint_vars
+					constraint[0] -= constraint_vars
 				elif len(constraint_vars) == constraint_val:
 					# resolved constraint, all mines
-					self.constraints[i][1] -= len(self.constraints[i][0].intersection(constraint_vars))
-					self.constraints[i][0] -= constraint_vars
+					constraint[1] -= len(constraint[0].intersection(constraint_vars))
+					constraint[0] -= constraint_vars
 				else:
 					# unresolved constraint
-					if self.constraints[i][0].issuperset(constraint_vars):
+					if constraint[0].issuperset(constraint_vars):
 						# new constraint is subset of old constraint
-						self.constraints[i][0] -= constraint_vars
-						self.constraints[i][1] -= constraint_val
-					elif self.constraints[i][0].issubset(constraint_vars):
+						constraint[0] -= constraint_vars
+						constraint[1] -= constraint_val
+					elif constraint[0].issubset(constraint_vars):
 						# old constraint is subset of new constraint
-						new_vars = constraint_vars.difference(self.constraints[i][0])
-						new_val = constraint_val - self.constraints[i][1]
+						new_vars = constraint_vars.difference(constraint[0])
+						new_val = constraint_val - constraint[1]
 						new_constraints.append([new_vars, new_val])
 						continue # skip remaining? must not add unaltered constraint
 
-				if not self.constraints[i][0]:
-					assert self.constraints[i][1] == 0, "constraint has no variables but value is not 0"
+				if not constraint[0]:
+					assert constraint[1] == 0, "constraint has no variables but value is not 0"
 					delete_set.add(i) # empty constraint, remove
 
 				# if constraint is resolved, add new variables to list
-				if self.constraints[i][1] == 0:
-					new_constraints.append(self.constraints[i])
-					self.safe_moves = self.safe_moves.union(self.constraints[i][0])
+				if constraint[1] == 0:
+					new_constraints.append(constraint)
+					self.safe_moves = self.safe_moves.union(constraint[0])
 					delete_set.add(i)
-				elif len(self.constraints[i][0]) == self.constraints[i][1]:
-					new_constraints.append(self.constraints[i])
-					self.known_mines = self.known_mines.union(self.constraints[i][0])
+				elif len(constraint[0]) == constraint[1]:
+					new_constraints.append(constraint)
+					self.known_mines = self.known_mines.union(constraint[0])
 					delete_set.add(i)
 
 			for i in sorted(delete_set, reverse=True):
@@ -132,11 +128,12 @@ class CSPSolver(MinesweeperSolver):
 			elif constraint_vars:
 				self.constraints.append([constraint_vars, constraint_val])
 
+
 	def _probabilistic_guess(self):
 		probabilities = dict() # calculate probabilities
 
 		# get unknown variables
-		remaining_variables = set(tuple(var) for var np.where(self.board.covered))
+		remaining_variables = set([tuple(var) for var in np.where(self.board.covered)])
 		remaining_variables -= self.known_mines
 		remaining_variables -= self.safe_moves
 
@@ -164,25 +161,114 @@ class CSPSolver(MinesweeperSolver):
 					probabilities[var] = prob
 			else:
 				# do initial ordering of variables by number of constraints they appear in
-				constraint_counts = dict()
-				for constraint in constraints:
-					for var in constraint[0]:
-						try:
-							constraint_counts[var] += 1
-						except KeyError:
-							constraint_counts[var] = 1
+				sums, total = self._constraint_dfs(constraints, dict(), 0, list())
+				for var in variables:
+					probabilities[var] = float(sums[var]) / total
 
-				sorted_vars = sorted(constraint_counts.items(), key=operator.itemgetter(1), reverse=True)
-				# perform dfs
 
-		# sort dictionary by values, min to max
-		# for every 0 add to safe spaces
-		# for every 1 add to known mines
-		# if known mines or safe spaces, edit constraints
-		# if no safe spaces, return random min prob
+	def _constraint_dfs(self, constraint_list, sums, total, var_val_pairs):
+		if not constraint_list: # all constraints resolved
+			# record variable value pairs in probabilities
+			total += 1
+			for var, val in var_val_pairs:
+				try:
+					sums[var] += val
+				except KeyError:
+					sums[var] = val
+			return sums, total
 
-	def _satisfies_constraints(self, vars, vals):
-		raise NotImplementedError # returns true if variable-value pairs are satisfied
+		# at each recursion, go through constraint list, select which variable to choose next
+		constraint_counts = dict()
+		for i, constraint in enumerate(constraint_list):
+			assert len(constraint[0]) >= constraint[1]
+			if constraint[1] == 0:
+				# all must be 0, set all as 0
+				new_constraint_list = constraint_list[:]
+				del new_constraint_list[i]
+				
+				# update constraints, look for conflicts
+				delete_set = set()
+				for j, new_constraint in enumerate(new_constraint_list):
+					new_constraint[0] -= constraint[0]
+
+					if new_constraint[1] < 0: # invalid assignment
+						return sums, total
+					elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
+						return sums, total
+					elif not new_constraint[0]:
+						delete_set.add(i)
+
+				# delete empty constraints
+				for i in sorted(delete_set, reverse=True):
+					del new_constraint_list[i]
+				
+				# recurse
+				var_val_pairs += [(var, 0) for var in constraint[0]]
+				sums, total = self._constraint_dfs(new_constraint_list, sums, total, var_val_pairs)
+				var_val_pairs = var_val_pairs[:-len(constraint[0])]
+				return sums, total
+			elif len(constraint[0]) == constraint[1]:
+				# all must be 1, set all as 1
+				new_constraint_list = constraint_list[:]
+				del new_constraint_list[i]
+				
+				# update constraints, look for conflicts
+				delete_set = set()
+				for j, new_constraint in enumerate(new_constraint_list):
+					new_constraint[1] -= len(constraint[0].disjoint(new_constraint[0]))
+					new_constraint[0] -= constraint[0]
+
+					if new_constraint[1] < 0: # invalid assignment
+						return sums, total
+					elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
+						return sums, total
+					elif not new_constraint[0]:
+						delete_set.add(i)
+
+				# delete empty constraints
+				for i in sorted(delete_set, reverse=True):
+					del new_constraint_list[i]
+				
+				# recurse
+				var_val_pairs += [(var, 1) for var in constraint[0]]
+				sums, total = self._constraint_dfs(new_constraint_list, sums, total, var_val_pairs)
+				var_val_pairs = var_val_pairs[:-len(constraint[0])]
+				return sums, total
+			
+			for var in constraint[0]:
+				try:
+					constraint_counts[var] += 1
+				except KeyError:
+					constraint_counts[var] = 1
+
+		chosen_var = sorted(constraint_counts.items(), key=operator.itemgetter(1), reverse=True)[0]
+		for chosen_val in [0, 1]:
+			# copy of constraints, update constraints based off of chosen value
+			new_constraint_list = constraint_list[:]
+			delete_set = set()
+			for i, constraint in enumerate(new_constraint_list):
+				if chosen_var in constraint[0]:
+					constraint[0].remove(chosen_var)
+					constraint[1] -= chosen_val
+
+				if constraint[1] < 0: # invalid assignment
+					continue
+				elif constraint[1] > 0 and not constraint[0]: # invalid assignment
+					continue
+				elif not constraint[0]:
+					delete_set.add(i)
+
+			# delete empty constraints
+			for i in sorted(delete_set, reverse=True):
+				del new_constraint_list[i]
+
+			# recurse with newly assigned value
+			var_val_pairs.append((chosen_var, chosen_val))
+			sums, total = self._constraint_dfs(new_constraint_list, sums, total, var_val_pairs)
+			var_val_pairs.pop()
+
+		return sums, total # backtrack, no valid options left
+
 
 	def act(self):
 		# view constraint list, determine which space to choose
@@ -190,6 +276,7 @@ class CSPSolver(MinesweeperSolver):
 		if self.safe_moves:
 			pos = self.safe_moves.pop()
 		else:
+			raise NotImplementedError
 			pos = self._probabilistic_guess()
 
 		val = self.board.reveal(pos)
@@ -215,7 +302,6 @@ def test_cps():
 			test_solver.save_state()
 		except NotImplementedError:
 			break
-	pdb.set_trace()
 
 
 if __name__ == '__main__':
