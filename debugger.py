@@ -17,7 +17,6 @@ def info(type, value, tb):
 
 def exception_debugger(function):
     def wrapper(*args, **kwargs):
-        print "Started Test Debugger\n"
         sys.excepthook = info
         function(*args, **kwargs)
 
