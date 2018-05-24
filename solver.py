@@ -15,11 +15,10 @@ from debugger import exception_debugger
 class InvalidConstraint(Exception):
 	pass
 
-
 class MinesweeperSolver(object):
-	def __init__(self, shape, mines, start=None, name='solver'):
-		self.board = MinesweeperState(shape, mines, start, render=True)
-		self.move = 1 if start else 0
+	def __init__(self, board, name='solver'):
+		self.board = board
+		self.guess = 0
 		self.name = name
 		# other shared variables, like remaining mines
 
@@ -32,12 +31,15 @@ class MinesweeperSolver(object):
 		if not os.path.exists("images"):
 			os.mkdir("images")
 
-		self.board.to_image("images/board_%d.png" % self.move)
+		if not os.path.exists("images/%s" % self.name):
+			os.mkdir("images/%s" % self.name)
+
+		self.board.to_image("images/%s/board_%d.png" % (self.name, self.board.move))
 
 
 
 class CSPSolver(MinesweeperSolver):
-	def __init__(self, shape, mines, start=None, name='csp'):
+	def __init__(self, board, name='csp'):
 		super(CSPSolver, self).__init__(shape, mines, start)
 		self.safe_moves = set() # set of safe spaces for fast moves
 		self.known_mines = set() # set of known mines
@@ -50,7 +52,9 @@ class CSPSolver(MinesweeperSolver):
 		for var in all_variables:
 			self.var_dict[var] = [self.constraints[0]]
 
-		if start:
+		# already made first move
+		if self.board.move == 1:
+			start = tuple(np.array(np.where(~test))[:,0])
 			self._add_constraint(start)
 
 
@@ -128,17 +132,11 @@ class CSPSolver(MinesweeperSolver):
 				self.constraints.append([constraint_vars, constraint_val])
 
 
-	def _probabilistic_guess(self):
-		probabilities = dict() # calculate probabilities
-
-		# get unknown variables
-		remaining_variables = set([(pos1, pos2) for pos1, pos2 in zip(*np.where(self.board.covered))])
-		remaining_variables -= self.known_mines
-		remaining_variables -= self.safe_moves
+	def _get_disjoint_sets(self, variables):
 		# split unknown variables into disjoint sets of variables and constraints
 		disjoint_sets = list()
-		while remaining_variables:
-			var = remaining_variables.pop()
+		while variables:
+			var = variables.pop()
 			disjoint_vars, disjoint_constraints = set(), set()
 			disjoint_vars.add(var)
 			last_vars = set()
@@ -151,7 +149,19 @@ class CSPSolver(MinesweeperSolver):
 
 			assert disjoint_constraints, "variable does not belong to a constraint"
 			disjoint_sets.append((disjoint_vars, [self.constraints[i] for i in disjoint_constraints]))
-			remaining_variables -= disjoint_vars
+			variables -= disjoint_vars
+
+		return disjoint_sets
+
+
+	def _probabilistic_guess(self):
+		probabilities = dict() # calculate probabilities
+
+		# get unknown variables
+		remaining_variables = set([(pos1, pos2) for pos1, pos2 in zip(*np.where(self.board.covered))])
+		remaining_variables -= self.known_mines
+		remaining_variables -= self.safe_moves
+		disjoint_sets = self._get_disjoint_sets(remaining_variables)
 		
 		for variables, constraints in disjoint_sets:
 			# check if single constraint
@@ -294,6 +304,8 @@ class CSPSolver(MinesweeperSolver):
 			pos = self.safe_moves.pop()
 		else:
 			pos, _ = self._probabilistic_guess()
+			self.guess += 1
+			print(self.move, self.guess, pos)
 
 		val = self.board.reveal(pos)
 		if val >= 0:
@@ -303,6 +315,33 @@ class CSPSolver(MinesweeperSolver):
 
 
 class CCCSPSolver(CSPSolver):
+	def _get_max_hyper_vars(self, variables, constraints):
+		# split variables into maximal sets
+		max_var_sets = set()
+		remaining_variables = set(variables)
+		while remaining_variables:
+			var = remaining_variables.pop()
+			max_set = set(variables)
+
+			for constraint in constraints:
+				if var in constraint[0]:
+					max_set = max_set.intersection(constraint[0])
+				else:
+					max_set -= constraint[0]
+
+			remaining_variables -= max_set
+			max_var_sets.add(frozenset(max_set))
+
+		# rewrite constraints in terms of new maximal set variables
+		max_constraints = copy.deepcopy(constraints)
+		for constraint in max_constraints:
+			for max_var in max_var_sets:
+				if constraint[0].issuperset(max_var):
+					constraint[0] -= max_var
+					constraint[0].add(max_var)
+
+		return max_var_sets, max_constraints
+
 	def _probabilistic_guess(self):
 		probabilities = dict() # calculate probabilities
 
@@ -312,22 +351,7 @@ class CCCSPSolver(CSPSolver):
 		remaining_variables -= self.safe_moves
 
 		# split unknown variables into disjoint sets of variables and constraints
-		disjoint_sets = list()
-		while remaining_variables:
-			var = remaining_variables.pop()
-			disjoint_vars, disjoint_constraints = set(), set()
-			disjoint_vars.add(var)
-			last_vars = set()
-			while disjoint_vars != last_vars:
-				last_vars = set(disjoint_vars)
-				for i, constraint in enumerate(self.constraints):
-					if disjoint_vars.intersection(constraint[0]):
-						disjoint_vars = disjoint_vars.union(constraint[0])
-						disjoint_constraints.add(i)
-
-			assert disjoint_constraints, "variable does not belong to a constraint"
-			disjoint_sets.append((disjoint_vars, [self.constraints[i] for i in disjoint_constraints]))
-			remaining_variables -= disjoint_vars
+		disjoint_sets = self._get_disjoint_sets(remaining_variables)
 		
 		for variables, constraints in disjoint_sets:
 			# check if single constraint
@@ -338,29 +362,7 @@ class CCCSPSolver(CSPSolver):
 				for var in constraints[0][0]:
 					probabilities[var] = prob
 			else:
-				# split variables into maximal sets
-				max_var_sets = set()
-				remaining_variables = set(variables)
-				while remaining_variables:
-					var = remaining_variables.pop()
-					max_set = set(variables)
-
-					for constraint in constraints:
-						if var in constraint[0]:
-							max_set = max_set.intersection(constraint[0])
-						else:
-							max_set -= constraint[0]
-
-					remaining_variables -= max_set
-					max_var_sets.add(frozenset(max_set))
-
-				# rewrite constraints in terms of new maximal set variables
-				max_constraints = copy.deepcopy(constraints)
-				for constraint in max_constraints:
-					for max_var in max_var_sets:
-						if constraint[0].issuperset(max_var):
-							constraint[0] -= max_var
-							constraint[0].add(max_var)
+				_, max_constraints = self._get_max_hyper_vars(variables, constraints)
 
 				# use dfs to calculate probabilities
 				sums, total = self._constraint_dfs(max_constraints, dict(), 0, list())
@@ -386,7 +388,6 @@ class CCCSPSolver(CSPSolver):
 
 	def _constraint_dfs(self, constraint_list, sums, total, var_val_pairs):
 		if not constraint_list: # all constraints resolved
-			print(var_val_pairs)
 			# record variable value pairs in probabilities
 			combinations = 1
 			for var, val in var_val_pairs:
@@ -403,7 +404,6 @@ class CCCSPSolver(CSPSolver):
 		# at each recursion, go through constraint list, select which variable to choose next
 		constraint_counts = dict()
 		for i, constraint in enumerate(constraint_list):
-			assert sum(len(max_set) for max_set in constraint[0]) >= constraint[1]
 			if constraint[1] == 0:
 				# all must be 0, set all as 0
 				new_constraint_list = copy.deepcopy(constraint_list)
@@ -418,8 +418,10 @@ class CCCSPSolver(CSPSolver):
 						return sums, total
 					elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
 						return sums, total
+					elif sum(len(max_set) for max_set in constraint[0]) < constraint[1]:
+						return sums, total
 					elif not new_constraint[0]:
-						delete_set.add(j)
+						delete_set.add(i)
 
 				# delete empty constraints
 				for j in sorted(delete_set, reverse=True):
@@ -448,8 +450,10 @@ class CCCSPSolver(CSPSolver):
 						return sums, total
 					elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
 						return sums, total
+					elif sum(len(max_set) for max_set in constraint[0]) < constraint[1]:
+						return sums, total
 					elif not new_constraint[0]:
-						delete_set.add(j)
+						delete_set.add(i)
 
 				# delete empty constraints
 				for j in sorted(delete_set, reverse=True):
@@ -478,8 +482,10 @@ class CCCSPSolver(CSPSolver):
 						return sums, total
 					elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
 						return sums, total
+					elif sum(len(max_set) for max_set in constraint[0]) < constraint[1]:
+						return sums, total
 					elif not new_constraint[0]:
-						delete_set.add(j)
+						delete_set.add(i)
 
 				# delete empty constraints
 				for j in sorted(delete_set, reverse=True):
@@ -511,8 +517,11 @@ class CCCSPSolver(CSPSolver):
 						raise InvalidConstraint
 					elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
 						raise InvalidConstraint
+					elif sum(len(max_set) for max_set in constraint[0]) < constraint[1]:
+						raise InvalidConstraint
 					elif not new_constraint[0]:
 						delete_set.add(i)
+
 			except InvalidConstraint:
 				continue
 

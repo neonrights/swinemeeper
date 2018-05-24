@@ -8,17 +8,28 @@ BORDER = 10
 WIDTH = 2
 COLORS = ["#0000FF", "#008200", "#FF0000", "#000084", "#840000", "#008284", "#840084", "#000000"]
 
+class GameOver(Exception):
+    pass
+
 # config for initial state and whether to render board
 class MinesweeperState:
-    def __init__(self, shape, mines, start=None, render=False):
+    def __init__(self, shape, mines, start=None, render=False, seed=None):
         self.covered = np.ones(shape, dtype=bool)
         self.adjacent_mines = np.zeros(shape, dtype=np.int8)
         self.mine_count = mines
+        self.move = 0
+        self._loss = False
+
+        # create seed
+        if seed:
+            np.random.seed(seed)
+            random.seed(seed)
 
         indices = [tuple(index) for index in np.ndindex(shape)]
         if start:
             self.covered[start] = False
             indices.remove(start)
+            self.move += 1
 
         # initialize mines
         assert mines < len(indices)
@@ -41,6 +52,7 @@ class MinesweeperState:
             self._init_image(shape)
             if start:
                 self._draw_cell(start)
+
 
     def _init_image(self, shape):
         # create image and draw background
@@ -71,16 +83,26 @@ class MinesweeperState:
         black_path = (BORDER, CELL*shape[1] + BORDER, CELL * shape[0] + BORDER, CELL*shape[1] + BORDER)
         self.drawer.line(black_path, fill="#7B7B7B", width=WIDTH)
 
+
     def reveal(self, pos):
+        if self._loss or self.is_goal():
+            raise GameOver()
+
         assert self.covered[pos], "chosen position has already been uncovered"
+        self.move += 1
         if self.render:
             self._draw_cell(pos) # alter image
 
         self.covered[pos] = False
-        return self.adjacent_mines[pos]
+        if self.adjacent_mines[pos] < 0:
+            self._loss = True
+
+        return self[adjacent_mines]
+
 
     def is_goal(self):
-        return self.covered.sum() == self.mine_count
+        return (self.covered.sum() == self.mine_count) and self._loss
+
 
     def _draw_cell(self, pos):
         # draw covered cell
@@ -102,7 +124,7 @@ class MinesweeperState:
             self.drawer.line((mine_border[0] + 4, mine_border[1] - 2, mine_border[2] - 4, mine_border[3] + 2), fill="#000000")
             self.drawer.rectangle((cell_border[0] + 5, cell_border[1] + 5, cell_border[0] + 6, cell_border[1] + 6), fill="#FFFFFF")
 
-    def to_image(self, dest):
+    def to_image(self, dest="move_%d" % self.move):
         if not self.render:
             raise RuntimeError("Graphics rendering option is disabled")
 
