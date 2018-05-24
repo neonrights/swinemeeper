@@ -16,6 +16,7 @@ class MinesweeperState:
     def __init__(self, shape, mines, start=None, render=False, seed=None):
         self.covered = np.ones(shape, dtype=bool)
         self.adjacent_mines = np.zeros(shape, dtype=np.int8)
+        self.shape = shape
         self.mine_count = mines
         self.move = 0
         self._loss = False
@@ -86,7 +87,7 @@ class MinesweeperState:
 
     def reveal(self, pos):
         if self._loss or self.is_goal():
-            raise GameOver()
+            raise GameOver
 
         assert self.covered[pos], "chosen position has already been uncovered"
         self.move += 1
@@ -97,7 +98,7 @@ class MinesweeperState:
         if self.adjacent_mines[pos] < 0:
             self._loss = True
 
-        return self[adjacent_mines]
+        return self.adjacent_mines[pos]
 
 
     def is_goal(self):
@@ -124,11 +125,15 @@ class MinesweeperState:
             self.drawer.line((mine_border[0] + 4, mine_border[1] - 2, mine_border[2] - 4, mine_border[3] + 2), fill="#000000")
             self.drawer.rectangle((cell_border[0] + 5, cell_border[1] + 5, cell_border[0] + 6, cell_border[1] + 6), fill="#FFFFFF")
 
-    def to_image(self, dest="move_%d" % self.move):
+
+    def to_image(self, dest=None):
         if not self.render:
             raise RuntimeError("Graphics rendering option is disabled")
 
-        self.image.save(dest)
+        if dest is None:
+            self.image.save("board_%d.png" % self.move)
+        else:
+            self.image.save(dest)
 
 
 def test_state():

@@ -17,10 +17,13 @@ class InvalidConstraint(Exception):
 
 class MinesweeperSolver(object):
 	def __init__(self, board, name='solver'):
-		self.board = board
-		self.guess = 0
 		self.name = name
+		self.new_game(board)
 		# other shared variables, like remaining mines
+
+	def new_game(self, new_board):
+		self.board = new_board
+
 
 	def act(self):
 		# determine which space to click on
@@ -40,13 +43,17 @@ class MinesweeperSolver(object):
 
 class CSPSolver(MinesweeperSolver):
 	def __init__(self, board, name='csp'):
-		super(CSPSolver, self).__init__(shape, mines, start)
+		super(CSPSolver, self).__init__(board, name)
+
+	def new_game(self, new_board):
+		super(CSPSolver, self).new_game(new_board)
+		self.guesses = 0
 		self.safe_moves = set() # set of safe spaces for fast moves
 		self.known_mines = set() # set of known mines
 
 		# initialize constraint list
-		all_variables = set(tuple(index) for index in np.ndindex(shape))
-		self.constraints = [[all_variables, mines]]
+		all_variables = set(tuple(index) for index in np.ndindex(self.board.shape))
+		self.constraints = [[all_variables, self.board.mine_count]]
 		# add dictionary for faster constraint pruning
 		self.var_dict = dict()
 		for var in all_variables:
@@ -54,7 +61,7 @@ class CSPSolver(MinesweeperSolver):
 
 		# already made first move
 		if self.board.move == 1:
-			start = tuple(np.array(np.where(~test))[:,0])
+			start = tuple(np.array(np.where(~self.board.covered))[:,0])
 			self._add_constraint(start)
 
 
@@ -299,13 +306,11 @@ class CSPSolver(MinesweeperSolver):
 
 	def act(self):
 		# view constraint list, determine which space to choose
-		self.move += 1
 		if self.safe_moves:
 			pos = self.safe_moves.pop()
 		else:
 			pos, _ = self._probabilistic_guess()
-			self.guess += 1
-			print(self.move, self.guess, pos)
+			self.guesses += 1
 
 		val = self.board.reveal(pos)
 		if val >= 0:
@@ -559,7 +564,8 @@ def test_csp_constraint_prune():
 @exception_debugger
 def test_csp_dfs():
 	# test dfs
-	test_solver = CSPSolver((5,5),5)
+	board = MinesweeperState((5,5),5)
+	test_solver = CSPSolver(board)
 	# test board state
 	test_solver.board.covered = np.ones((5,5), dtype=bool)
 	test_solver.board.adjacent_mines = np.array([[ 1,  2,  1, 1, 0],
@@ -616,7 +622,8 @@ def test_csp_dfs():
 @exception_debugger
 def test_cccsp_dfs():
 	# test dfs
-	test_solver = CCCSPSolver((5,5),5)
+	board = MinesweeperState((5,5),5)
+	test_solver = CCCSPSolver(board)
 	# test board state
 	test_solver.board.covered = np.ones((5,5), dtype=bool)
 	test_solver.board.adjacent_mines = np.array([[ 1,  2,  1, 1, 0],
@@ -671,4 +678,5 @@ def test_cccsp_dfs():
 
 
 if __name__ == '__main__':
+	test_csp_dfs()
 	test_cccsp_dfs()
