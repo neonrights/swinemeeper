@@ -6,9 +6,14 @@ import operator
 import numpy as np
 
 from collections import deque
+from scipy.misc import comb
 
 from state import MinesweeperState
 from debugger import exception_debugger
+
+
+class InvalidConstraint(Exception):
+	pass
 
 
 class MinesweeperSolver(object):
@@ -147,7 +152,7 @@ class CSPSolver(MinesweeperSolver):
 			assert disjoint_constraints, "variable does not belong to a constraint"
 			disjoint_sets.append((disjoint_vars, [self.constraints[i] for i in disjoint_constraints]))
 			remaining_variables -= disjoint_vars
-		#pdb.set_trace()
+		
 		for variables, constraints in disjoint_sets:
 			# check if single constraint
 			if len(constraints) == 1:
@@ -178,7 +183,6 @@ class CSPSolver(MinesweeperSolver):
 
 
 	def _constraint_dfs(self, constraint_list, sums, total, var_val_pairs):
-		#pdb.set_trace()
 		if not constraint_list: # all constraints resolved
 			# record variable value pairs in probabilities
 			total += 1
@@ -256,17 +260,20 @@ class CSPSolver(MinesweeperSolver):
 			# copy of constraints, update constraints based off of chosen value
 			new_constraint_list = copy.deepcopy(constraint_list)
 			delete_set = set()
-			for i, new_constraint in enumerate(new_constraint_list):
-				if chosen_var in new_constraint[0]:
-					new_constraint[0].remove(chosen_var)
-					new_constraint[1] -= chosen_val
+			try:
+				for i, new_constraint in enumerate(new_constraint_list):
+					if chosen_var in new_constraint[0]:
+						new_constraint[0].remove(chosen_var)
+						new_constraint[1] -= chosen_val
 
-				if new_constraint[1] < 0: # invalid assignment
-					continue
-				elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
-					continue
-				elif not new_constraint[0]:
-					delete_set.add(i)
+					if new_constraint[1] < 0: # invalid assignment
+						raise InvalidConstraint
+					elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
+						raise InvalidConstraint
+					elif not new_constraint[0]:
+						delete_set.add(i)
+			except InvalidConstraint:
+				continue
 
 			# delete empty constraints
 			for i in sorted(delete_set, reverse=True):
@@ -355,10 +362,9 @@ class CCCSPSolver(CSPSolver):
 							constraint[0] -= max_var
 							constraint[0].add(max_var)
 
-				pdb.set_trace()
 				# use dfs to calculate probabilities
 				sums, total = self._constraint_dfs(max_constraints, dict(), 0, list())
-				for max_var, val in sums:
+				for max_var, val in sums.items():
 					set_size = len(max_var)
 					for var in max_var:
 						probabilities[var] = float(val) / (set_size * total)
@@ -380,14 +386,19 @@ class CCCSPSolver(CSPSolver):
 
 	def _constraint_dfs(self, constraint_list, sums, total, var_val_pairs):
 		if not constraint_list: # all constraints resolved
+			print(var_val_pairs)
 			# record variable value pairs in probabilities
-			total += 1
+			combinations = 1
+			for var, val in var_val_pairs:
+				combinations *= comb(len(var), val)
+
 			for var, val in var_val_pairs:
 				try:
-					sums[var] += val
+					sums[var] += val * combinations
 				except KeyError:
-					sums[var] = val
-			return sums, total
+					sums[var] = val * combinations
+
+			return sums, total + combinations
 
 		# at each recursion, go through constraint list, select which variable to choose next
 		constraint_counts = dict()
@@ -418,6 +429,37 @@ class CCCSPSolver(CSPSolver):
 				new_var_val_pairs = list(var_val_pairs) + [(var, 0) for var in constraint[0]]
 				sums, total = self._constraint_dfs(new_constraint_list, sums, total, new_var_val_pairs)
 				return sums, total
+			elif len(constraint[0]) == 1:
+				# only a single superset variable left, must be equal to remainder
+				max_var = next(iter(constraint[0]))
+				if len(max_var) < constraint[1] or constraint[1] < 0:
+					return sums, total
+
+				new_constraint_list = copy.deepcopy(constraint_list)
+				del new_constraint_list[i]
+
+				delete_set = set()
+				for j, new_constraint in enumerate(new_constraint_list):
+					if max_var in new_constraint[0]:
+						new_constraint[0].remove(max_var)
+						new_constraint[1] -= constraint[1]
+
+					if new_constraint[1] < 0: # invalid assignment
+						return sums, total
+					elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
+						return sums, total
+					elif not new_constraint[0]:
+						delete_set.add(j)
+
+				# delete empty constraints
+				for j in sorted(delete_set, reverse=True):
+					del new_constraint_list[j]
+				
+				# recurse
+				new_var_val_pairs = list(var_val_pairs)
+				new_var_val_pairs.append((max_var, constraint[1]))
+				sums, total = self._constraint_dfs(new_constraint_list, sums, total, new_var_val_pairs)
+				return sums, total
 			elif sum([len(max_set) for max_set in constraint[0]]) == constraint[1]:
 				# all must be 1, set all as 1
 				new_constraint_list = copy.deepcopy(constraint_list)
@@ -444,7 +486,7 @@ class CCCSPSolver(CSPSolver):
 					del new_constraint_list[j]
 				
 				# recurse
-				new_var_val_pairs = list(var_val_pairs) + [(var, 1) for var in constraint[0]]
+				new_var_val_pairs = list(var_val_pairs) + [(var, len(var)) for var in constraint[0]]
 				sums, total = self._constraint_dfs(new_constraint_list, sums, total, new_var_val_pairs)
 				return sums, total
 			
@@ -455,21 +497,24 @@ class CCCSPSolver(CSPSolver):
 					constraint_counts[var] = 1
 
 		chosen_var = max(constraint_counts.items(), key=operator.itemgetter(1))[0]
-		for chosen_val in range(len(chosen_var)):
+		for chosen_val in range(len(chosen_var)+1):
 			# copy of constraints, update constraints based off of chosen value
 			new_constraint_list = copy.deepcopy(constraint_list)
 			delete_set = set()
-			for i, new_constraint in enumerate(new_constraint_list):
-				if chosen_var in new_constraint[0]:
-					new_constraint[0].remove(chosen_var)
-					new_constraint[1] -= chosen_val
+			try:
+				for i, new_constraint in enumerate(new_constraint_list):
+					if chosen_var in new_constraint[0]:
+						new_constraint[0].remove(chosen_var)
+						new_constraint[1] -= chosen_val
 
-				if new_constraint[1] < 0: # invalid assignment
-					continue
-				elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
-					continue
-				elif not new_constraint[0]:
-					delete_set.add(i)
+					if new_constraint[1] < 0: # invalid assignment
+						raise InvalidConstraint
+					elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
+						raise InvalidConstraint
+					elif not new_constraint[0]:
+						delete_set.add(i)
+			except InvalidConstraint:
+				continue
 
 			# delete empty constraints
 			for i in sorted(delete_set, reverse=True):
