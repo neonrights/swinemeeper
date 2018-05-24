@@ -93,6 +93,7 @@ class MinesweeperState:
             self.drawer.text(text_anchor, str(val), fill=COLORS[val - 1], align="center")
         elif val < 0:
             # draw a nice mine
+            self.drawer.rectangle(cell_border, fill="#FF0000")
             mine_border = (cell_border[0] + 3, cell_border[1] + 3, cell_border[2] - 3, cell_border[3] - 3)
             self.drawer.ellipse(mine_border, fill="#000000")
             self.drawer.line(mine_border, fill="#000000")
