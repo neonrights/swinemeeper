@@ -8,8 +8,9 @@ import numpy as np
 from collections import deque
 from scipy.misc import comb
 
-from state import MinesweeperState
-from debugger import exception_debugger
+from state import *
+from debugger import *
+import pdb
 
 
 class InvalidConstraint(Exception):
@@ -26,9 +27,9 @@ class MinesweeperSolver(object):
 
 
 	def act(self):
-		# determine which space to click on
-		# determine if game is over
-		raise NotImplementedError
+		if self.board.is_goal() or self.board._loss:
+			raise GameOver
+
 
 	def save_state(self):
 		if not os.path.exists("images"):
@@ -40,13 +41,14 @@ class MinesweeperSolver(object):
 		self.board.to_image("images/%s/board_%d.png" % (self.name, self.board.move))
 
 
-
 class CSPSolver(MinesweeperSolver):
 	def __init__(self, board, name='csp'):
 		super(CSPSolver, self).__init__(board, name)
 
+
 	def new_game(self, new_board):
 		super(CSPSolver, self).new_game(new_board)
+		self.nodes = 0
 		self.guesses = 0
 		self.safe_moves = set() # set of safe spaces for fast moves
 		self.known_mines = set() # set of known mines
@@ -213,7 +215,6 @@ class CSPSolver(MinesweeperSolver):
 		# at each recursion, go through constraint list, select which variable to choose next
 		constraint_counts = dict()
 		for i, constraint in enumerate(constraint_list):
-			assert len(constraint[0]) >= constraint[1]
 			if constraint[1] == 0:
 				# all must be 0, set all as 0
 				new_constraint_list = copy.deepcopy(constraint_list)
@@ -228,6 +229,8 @@ class CSPSolver(MinesweeperSolver):
 						return sums, total
 					elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
 						return sums, total
+					elif len(constraint[0]) < constraint[1]:
+						return sums, total
 					elif not new_constraint[0]:
 						delete_set.add(j)
 
@@ -236,6 +239,7 @@ class CSPSolver(MinesweeperSolver):
 					del new_constraint_list[j]
 				
 				# recurse
+				self.nodes += 1
 				new_var_val_pairs = list(var_val_pairs) + [(var, 0) for var in constraint[0]]
 				sums, total = self._constraint_dfs(new_constraint_list, sums, total, new_var_val_pairs)
 				return sums, total
@@ -254,6 +258,8 @@ class CSPSolver(MinesweeperSolver):
 						return sums, total
 					elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
 						return sums, total
+					elif len(constraint[0]) < constraint[1]:
+						return sums, total
 					elif not new_constraint[0]:
 						delete_set.add(j)
 
@@ -262,6 +268,7 @@ class CSPSolver(MinesweeperSolver):
 					del new_constraint_list[j]
 				
 				# recurse
+				self.nodes += 1
 				new_var_val_pairs = list(var_val_pairs) + [(var, 1) for var in constraint[0]]
 				sums, total = self._constraint_dfs(new_constraint_list, sums, total, new_var_val_pairs)
 				return sums, total
@@ -287,6 +294,8 @@ class CSPSolver(MinesweeperSolver):
 						raise InvalidConstraint
 					elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
 						raise InvalidConstraint
+					elif len(constraint[0]) < constraint[1]:
+						raise InvalidConstraint
 					elif not new_constraint[0]:
 						delete_set.add(i)
 			except InvalidConstraint:
@@ -297,6 +306,7 @@ class CSPSolver(MinesweeperSolver):
 				del new_constraint_list[i]
 			
 			# recurse with newly assigned value
+			self.nodes += 1
 			new_var_val_pairs = list(var_val_pairs)
 			new_var_val_pairs.append((chosen_var, chosen_val))
 			sums, total = self._constraint_dfs(new_constraint_list, sums, total, new_var_val_pairs)
@@ -305,6 +315,8 @@ class CSPSolver(MinesweeperSolver):
 
 
 	def act(self):
+		super(CSPSolver, self).act()
+
 		# view constraint list, determine which space to choose
 		if self.safe_moves:
 			pos = self.safe_moves.pop()
@@ -433,6 +445,7 @@ class CCCSPSolver(CSPSolver):
 					del new_constraint_list[j]
 				
 				# recurse
+				self.nodes += 1
 				new_var_val_pairs = list(var_val_pairs) + [(var, 0) for var in constraint[0]]
 				sums, total = self._constraint_dfs(new_constraint_list, sums, total, new_var_val_pairs)
 				return sums, total
@@ -465,6 +478,7 @@ class CCCSPSolver(CSPSolver):
 					del new_constraint_list[j]
 				
 				# recurse
+				self.nodes += 1
 				new_var_val_pairs = list(var_val_pairs)
 				new_var_val_pairs.append((max_var, constraint[1]))
 				sums, total = self._constraint_dfs(new_constraint_list, sums, total, new_var_val_pairs)
@@ -497,6 +511,7 @@ class CCCSPSolver(CSPSolver):
 					del new_constraint_list[j]
 				
 				# recurse
+				self.nodes += 1
 				new_var_val_pairs = list(var_val_pairs) + [(var, len(var)) for var in constraint[0]]
 				sums, total = self._constraint_dfs(new_constraint_list, sums, total, new_var_val_pairs)
 				return sums, total
@@ -535,6 +550,7 @@ class CCCSPSolver(CSPSolver):
 				del new_constraint_list[i]
 			
 			# recurse with newly assigned value
+			self.nodes += 1
 			new_var_val_pairs = list(var_val_pairs)
 			new_var_val_pairs.append((chosen_var, chosen_val))
 			sums, total = self._constraint_dfs(new_constraint_list, sums, total, new_var_val_pairs)

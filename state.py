@@ -27,10 +27,12 @@ class MinesweeperState:
             random.seed(seed)
 
         indices = [tuple(index) for index in np.ndindex(shape)]
-        if start:
-            self.covered[start] = False
-            indices.remove(start)
-            self.move += 1
+        if start is None:
+            start = (random.randint(0, shape[0]-1), random.randint(0, shape[1]-1))
+
+        self.covered[start] = False
+        indices.remove(start)
+        self.move += 1
 
         # initialize mines
         assert mines < len(indices)
@@ -51,8 +53,7 @@ class MinesweeperState:
         self.render = render
         if self.render:
             self._init_image(shape)
-            if start:
-                self._draw_cell(start)
+            self._draw_cell(start)
 
 
     def _init_image(self, shape):
@@ -102,7 +103,7 @@ class MinesweeperState:
 
 
     def is_goal(self):
-        return (self.covered.sum() == self.mine_count) and self._loss
+        return (self.covered.sum() == self.mine_count) and not self._loss
 
 
     def _draw_cell(self, pos):
