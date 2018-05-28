@@ -5,7 +5,7 @@ import numpy as np
 from collections import deque
 from scipy.misc import comb
 
-from state import *
+from MinesweeperState import *
 from CSPSolver import *
 from debugger import *
 
