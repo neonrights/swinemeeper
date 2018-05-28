@@ -1,1 +1,1 @@
-Minesweeper CSP solver
+Minesweeper solver created for final project of CS261A: Problem Solving and Search taught by UCLA professor Richard Korf.  Solver works by treating minesweeper as a constraint satisfaction problem where each space is a boolean variable where 0 is a clear space and 1 contains a bomb.
