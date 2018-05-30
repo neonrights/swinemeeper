@@ -11,6 +11,9 @@ from debugger import *
 
 
 class CCCSPSolver(CSPSolver):
+	def __init__(self, board, name='cccsp'):
+		super(CCCSPSolver, self).__init__(board, name)
+
 	def _get_max_hyper_vars(self, variables, constraints):
 		# split variables into maximal sets
 		max_var_sets = set()
