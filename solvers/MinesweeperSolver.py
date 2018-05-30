@@ -4,9 +4,6 @@ import sys
 from MinesweeperState import *
 
 
-class InvalidConstraint(Exception):
-	pass
-
 class MinesweeperSolver(object):
 	def __init__(self, board, name='solver'):
 		self.name = name

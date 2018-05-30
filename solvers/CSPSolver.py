@@ -9,6 +9,10 @@ from MinesweeperSolver import *
 from debugger import *
 
 
+class InvalidConstraint(Exception):
+	pass
+
+
 class CSPSolver(MinesweeperSolver):
 	def __init__(self, board, name='csp'):
 		super(CSPSolver, self).__init__(board, name)
