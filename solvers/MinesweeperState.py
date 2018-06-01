@@ -43,12 +43,9 @@ class MinesweeperState:
 
         # create neighboring mines
         for index in indices:
-            for i in [-1, 0, 1]:
-                for j in [-1, 0, 1]:
-                    neighbor = (index[0] + i, index[1] + j)
-                    if 0 <= neighbor[0] < shape[0] and 0 <= neighbor[1] < shape[1]:
-                        if neighbor != index and self.adjacent_mines[neighbor] >= 0:
-                            self.adjacent_mines[neighbor] += 1
+            for neighbor in get_neighbors(index, shape):
+                if self.adjacent_mines[neighbor] >= 0:
+                    self.adjacent_mines[neighbor] += 1
 
         # create graphics for board state
         self.render = render
@@ -137,6 +134,15 @@ class MinesweeperState:
             self.image.save("board_%d.png" % self.move)
         else:
             self.image.save(dest)
+
+
+def get_neighbors(pos, shape):
+    for i in [-1, 0, 1]:
+        for j in [-1, 0, 1]:
+            neighbor = (pos[0] + i, pos[1] + j)
+            if 0 <= neighbor[0] < shape[0] and 0 <= neighbor[1] < shape[1]:
+                if neighbor != pos:
+                    yield neighbor
 
 
 def test_state():

@@ -12,6 +12,7 @@ class ExpectedConstraintSolver(CCCSPSolver):
 
 	def _probabilistic_guess(self):
 		probabilities = dict() # calculate probabilities
+		expected_probs = dict()
 
 		# get unknown variables
 		remaining_variables = set([(pos1, pos2) for pos1, pos2 in zip(*np.where(self.board.covered))])
@@ -27,8 +28,20 @@ class ExpectedConstraintSolver(CCCSPSolver):
 				assert constraints[0][1] > 0, "uncaught resolved/invalid constraint"
 				# determine if crapshoot, if so, guess immediately
 				prob = float(constraints[0][1]) / len(constraints[0][0])
+				e_prob = float(constraint[0][1]) / (len(constraint[0][0]) - 1)
 				for var in constraints[0][0]:
 					probabilities[var] = prob
+					for neighbor in get_neighbors(var, self.board.shape):
+						try:
+							if neighbor in constraint[0][0]:
+								expected_probs[neighbor] += e_prob
+							else:
+								expected_probs[neighbor] += prob
+						except KeyError:
+							if neighbor in constraint[0][0]:
+								expected_probs[neighbor] = e_prob
+							else:
+								expected_probs[neighbor] = prob
 			else:
 				_, max_constraints = self._get_max_hyper_vars(variables, constraints)
 
@@ -36,8 +49,15 @@ class ExpectedConstraintSolver(CCCSPSolver):
 				sums, total, e_sums, e_totals = self._constraint_dfs(max_constraints, dict(), 0, dict(), dict(), list())
 				for max_var, val in sums.items():
 					set_size = len(max_var)
+					prob = float(val) / (set_size * total)
 					for var in max_var:
-						probabilities[var] = float(val) / (set_size * total)
+						probabilities[var] = prob
+						for neighbor in get_neighbors(var, self.board.shape):
+							# TODO calculate expected probs, uses neighbor and var
+							try:
+								expected_probs[neighbor] += 1
+							except KeyError:
+								expected_probs[neighbor] = 1
 
 		# find 0's and 1's
 		for pos, val in probabilities.items():
@@ -50,8 +70,7 @@ class ExpectedConstraintSolver(CCCSPSolver):
 			guess = self.safe_moves.pop()
 		else:
 			# calculate expected constraint value for all min probs
-			# select min expected constraint
-			guess = min(probabilities.items(), key=operator.itemgetter(1))[0]
+			raise NotImplementedError
 
 		return guess, probabilities
 
@@ -76,19 +95,20 @@ class ExpectedConstraintSolver(CCCSPSolver):
 						else:
 							e_combs *= comb(len(e_var), e_val)
 
+					# unique total
 					try:
 						e_totals[var] += e_combs
 					except KeyError:
 						e_totals[var] = e_combs
 
+					# unique combinations
+					e_sums[var] = {var : (var - 1) * e_combs}
 					for e_var, e_val in var_val_pairs:
 						try:
-							e_sums[var][e_var] += e_val * e_combs
+							if var is not e_var:
+								e_sums[var][e_var] += e_val * e_combs
 						except KeyError:
-							try:
-								e_sums[var][e_var] = e_val * e_combs
-							except KeyError:
-								e_sums[var] = {e_var : e_val * e_combs}
+							e_sums[var][e_var] = e_val * e_combs
 
 			return sums, total + combinations, e_sums, e_totals
 
