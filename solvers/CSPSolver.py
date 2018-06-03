@@ -53,7 +53,8 @@ class CSPSolver(MinesweeperSolver):
 		# remove known mines from constraint, update constraint
 		constraint_val -= len(constraint_vars.intersection(self.known_mines))
 		constraint_vars -= self.known_mines
-		assert constraint_val >= 0, "invalid constraint value after pruning known mines"
+		if constraint_val < 0:
+			raise InvalidConstraint
 
 		new_constraints = deque()
 		new_constraints.append([set([position]), 0]) # prune newly revealed space
@@ -86,7 +87,8 @@ class CSPSolver(MinesweeperSolver):
 						continue # skip remaining? must not add unaltered constraint
 
 				if not constraint[0]:
-					assert constraint[1] == 0, "constraint has no variables but value is not 0"
+					if constraint[1] != 0:
+						raise InvalidConstraint
 					delete_set.add(i) # empty constraint, remove
 
 				# if constraint is resolved, add new variables to list
@@ -185,6 +187,7 @@ class CSPSolver(MinesweeperSolver):
 			return sums, total
 
 		# at each recursion, go through constraint list, select which variable to choose next
+		self.nodes += 1
 		constraint_counts = dict()
 		for i, constraint in enumerate(constraint_list):
 			if constraint[1] == 0:
@@ -211,7 +214,6 @@ class CSPSolver(MinesweeperSolver):
 					del new_constraint_list[j]
 				
 				# recurse
-				self.nodes += 1
 				new_var_val_pairs = list(var_val_pairs) + [(var, 0) for var in constraint[0]]
 				sums, total = self._constraint_dfs(new_constraint_list, sums, total, new_var_val_pairs)
 				return sums, total
@@ -240,7 +242,6 @@ class CSPSolver(MinesweeperSolver):
 					del new_constraint_list[j]
 				
 				# recurse
-				self.nodes += 1
 				new_var_val_pairs = list(var_val_pairs) + [(var, 1) for var in constraint[0]]
 				sums, total = self._constraint_dfs(new_constraint_list, sums, total, new_var_val_pairs)
 				return sums, total
@@ -278,7 +279,6 @@ class CSPSolver(MinesweeperSolver):
 				del new_constraint_list[i]
 			
 			# recurse with newly assigned value
-			self.nodes += 1
 			new_var_val_pairs = list(var_val_pairs)
 			new_var_val_pairs.append((chosen_var, chosen_val))
 			sums, total = self._constraint_dfs(new_constraint_list, sums, total, new_var_val_pairs)

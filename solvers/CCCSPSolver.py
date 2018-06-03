@@ -101,6 +101,7 @@ class CCCSPSolver(CSPSolver):
 			return sums, total + combinations
 
 		# at each recursion, go through constraint list, select which variable to choose next
+		self.nodes += 1
 		constraint_counts = dict()
 		for i, constraint in enumerate(constraint_list):
 			if constraint[1] == 0:
@@ -127,7 +128,6 @@ class CCCSPSolver(CSPSolver):
 					del new_constraint_list[j]
 				
 				# recurse
-				self.nodes += 1
 				new_var_val_pairs = list(var_val_pairs) + [(var, 0) for var in constraint[0]]
 				sums, total = self._constraint_dfs(new_constraint_list, sums, total, new_var_val_pairs)
 				return sums, total
@@ -160,7 +160,6 @@ class CCCSPSolver(CSPSolver):
 					del new_constraint_list[j]
 				
 				# recurse
-				self.nodes += 1
 				new_var_val_pairs = list(var_val_pairs)
 				new_var_val_pairs.append((max_var, constraint[1]))
 				sums, total = self._constraint_dfs(new_constraint_list, sums, total, new_var_val_pairs)
@@ -193,7 +192,6 @@ class CCCSPSolver(CSPSolver):
 					del new_constraint_list[j]
 				
 				# recurse
-				self.nodes += 1
 				new_var_val_pairs = list(var_val_pairs) + [(var, len(var)) for var in constraint[0]]
 				sums, total = self._constraint_dfs(new_constraint_list, sums, total, new_var_val_pairs)
 				return sums, total
@@ -232,7 +230,6 @@ class CCCSPSolver(CSPSolver):
 				del new_constraint_list[i]
 			
 			# recurse with newly assigned value
-			self.nodes += 1
 			new_var_val_pairs = list(var_val_pairs)
 			new_var_val_pairs.append((chosen_var, chosen_val))
 			sums, total = self._constraint_dfs(new_constraint_list, sums, total, new_var_val_pairs)
