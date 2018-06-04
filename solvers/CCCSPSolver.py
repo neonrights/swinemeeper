@@ -66,9 +66,9 @@ class CCCSPSolver(CSPSolver):
 				# use dfs to calculate probabilities
 				sums, total = self._constraint_dfs(max_constraints, dict(), 0, list())
 				for max_var, val in sums.items():
-					set_size = len(max_var)
+					prob = float(val) / (len(max_var) * total)
 					for var in max_var:
-						probabilities[var] = float(val) / (set_size * total)
+						probabilities[var] = prob
 
 		# find 0's and 1's
 		for pos, val in probabilities.items():
@@ -235,6 +235,7 @@ class CCCSPSolver(CSPSolver):
 			sums, total = self._constraint_dfs(new_constraint_list, sums, total, new_var_val_pairs)
 
 		return sums, total # backtrack, no valid options left
+
 
 @exception_debugger
 def test_cccsp_dfs():
