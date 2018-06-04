@@ -5,18 +5,11 @@ import numpy as np
 from CCCSPSolver import *
 from MinesweeperState import *
 
+
 # reweights min probabilities by probability of 0 + max neighboring mines
 class GreedySolver(CCCSPSolver):
 	def __init__(self, board, name='greedy'):
 		super(CCCSPSolver, self).__init__(board, name)
-
-
-	def _valid_constraint(vars, val):
-		constraint_list = copy.deepcopy(self.constraints)
-		for constraint in constraint_list:
-			pass # edit every constraint, see if conflicts arise
-
-		return True
 
 
 	def _probabilistic_guess(self):
@@ -40,10 +33,6 @@ class GreedySolver(CCCSPSolver):
 				prob = float(constraints[0][1]) / len(constraints[0][0])
 				for var in constraints[0][0]:
 					probabilities[var] = prob
-					for neighbor in get_neighbors(var):
-						if neighbor in remaining_variables:
-							pass # calculate min and max probs assuming valid
-
 			else:
 				_, max_constraints = self._get_max_hyper_vars(variables, constraints)
 
@@ -53,10 +42,7 @@ class GreedySolver(CCCSPSolver):
 					set_size = len(max_var)
 					for var in max_var:
 						probabilities[var] = float(val) / (set_size * total)
-						for neighbor in get_neighbors(var):
-							if neighbor in remaining_variables:
-								pass # calculate min and max probs assuming valid
-
+						
 		# find 0's and 1's
 		for pos, val in probabilities.items():
 			if val == 0:
@@ -79,14 +65,14 @@ class GreedySolver(CCCSPSolver):
 				else:
 					raise Exception # should never get here
 
-			if len(min_pos == 1):
+			if len(min_pos) == 1:
 				guess = min_pos[0]
 			else:
 				# calculate probability of each space being min or max constraint
 				# set guess as highest probability
 				pos_gain = list()
 				for pos in min_pos:
-					pos_gain.append((pos, self._zero_one_state_count(pos, disjoint_sets[:])))
+					pos_gain.append((pos, self._zero_one_state_count(pos, copy.deepcopy(disjoint_sets))))
 
 				guess = max(pos_gain, key=lambda x : x[1])[0]
 
@@ -96,7 +82,7 @@ class GreedySolver(CCCSPSolver):
 	def _zero_one_state_count(self, pos, disjoint_sets):
 		# edit disjoint_sets to reflect changes
 		# perform dfs and return number of viable options
-		dream_constraint = set(get_neighbors(pos))
+		dream_constraint = set(get_neighbors(pos, self.board.shape))
 		dream_constraint.add(pos)
 
 		zero_total = 1
@@ -121,16 +107,16 @@ class GreedySolver(CCCSPSolver):
 				one_total *= comb(len(constraints[0][0]), constraints[0][1] - len(common))
 			else:
 				variables -= dream_constraint
-				zero_constraints, one_constraints = self._adjust_constraints(dream_constraint, variables, constraints)
+				zero_constraints, one_constraints = self._adjust_constraints(dream_constraint, constraints)
 				if zero_constraints:
-					max_zero_constraints = self._get_max_hyper_vars(variables, zero_constraints)
+					_, max_zero_constraints = self._get_max_hyper_vars(variables, zero_constraints)
 					_, total = self._constraint_dfs(max_zero_constraints, dict(), 0, list())
 					zero_total *= total
 				else:
 					zero_total = 0
 
 				if one_constraints:
-					max_one_constraints = self._get_max_hyper_vars(variables, one_constraints)
+					_, max_one_constraints = self._get_max_hyper_vars(variables, one_constraints)
 					_, total = self._constraint_dfs(max_one_constraints, dict(), 0, list())
 					one_total *= total
 				else:
@@ -142,21 +128,21 @@ class GreedySolver(CCCSPSolver):
 	def _adjust_constraints(self, new_constraint, constraints):
 		zero_constraints = list()
 		one_constraints = list()
-		for constraint in constraints:
-			common = constraint.intersection(new_constraint)
+		for constraint in constraints[:]:
+			common = constraint[0].intersection(new_constraint)
 			constraint[0] -= new_constraint
 
-			if zero_constraints is not None and len(constraint[0]) >= constraint[1]:
+			if len(constraint[0]) >= constraint[1]:
 				zero_constraints.append(constraint)
 			else:
 				zero_constraints = None
+				break
 
-			if one_constraints is not None and len(common) <= constraint[1]:
-				zero_constraints.append((constraint[0], constraint[1] - len(common)))
+		for constraint in constraints[:]:
+			if len(common) <= constraint[1]:
+				one_constraints.append([constraint[0], constraint[1] - len(common)])
 			else:
-				zero_constraints = None
-
-			if zero_constraints is None and one_constraints is None:
+				one_constraints = None
 				break
 
 		return zero_constraints, one_constraints
