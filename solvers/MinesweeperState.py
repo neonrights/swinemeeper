@@ -145,6 +145,35 @@ def get_neighbors(pos, shape):
                     yield neighbor
 
 
+def compute_adjacent_mines(mine_positions):
+    mine_positions = mine_positions.astype(bool)
+
+    adjacent_mines = np.zeros_like(mine_positions, dtype=np.int8)
+    adjacent_mines[:-1] += mine_positions[1:]
+    adjacent_mines[1:] += mine_positions[:-1]
+    adjacent_mines[:,:-1] += mine_positions[:,1:]
+    adjacent_mines[:,1:] += mine_positions[:,:-1]
+    adjacent_mines[1:,1:] += mine_positions[:-1,:-1]
+    adjacent_mines[:-1,:-1] += mine_positions[1:,1:]
+    adjacent_mines[:-1,1:] += mine_positions[1:,:-1]
+    adjacent_mines[1:,:-1] += mine_positions[:-1,1:]
+
+    for position in zip(*np.where(mine_positions)):
+        adjacent_mines[position] = -1
+
+    return adjacent_mines
+
+
+def draw_state(dest, mine_placement, covered):
+    state = MinesweeperState(mine_placement.shape, mine_placement.sum(), render=True)
+    state.adjacent_mines = compute_adjacent_mines(mine_placement)
+    
+    for position in zip(*np.where(~covered)):
+        state._draw_cell(position)
+
+    state.to_image(dest=dest)
+
+
 def test_state():
     shape = (10, 8)
     test = MinesweeperState(shape, 10, render=True)
