@@ -41,14 +41,8 @@ class CSPSolver(MinesweeperSolver):
 
 	def _add_constraint(self, position):
 		# determine unknown neighbors
-		constraint_vars = set()
+		constraint_vars = set(get_neighbors(position, self.board.shape))
 		constraint_val = self.board.adjacent_mines[position]
-		for i in [-1, 0, 1]:
-			for j in [-1, 0, 1]:
-				neighbor = (position[0] + i, position[1] + j)
-				if 0 <= neighbor[0] < self.board.covered.shape[0] and 0 <= neighbor[1] < self.board.covered.shape[1]:
-					if neighbor != position and self.board.covered[neighbor]:
-						constraint_vars.add(neighbor)
 
 		# remove known mines from constraint, update constraint
 		constraint_val -= len(constraint_vars.intersection(self.known_mines))
