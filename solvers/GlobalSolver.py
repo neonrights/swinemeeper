@@ -37,7 +37,7 @@ class GlobalSolver(CSPSolver):
 		return guess, win_probability
 
 
-	def _calculate_win_prob(self, dream_board, constraints, variables, known_mines, safe_moves):
+	def _calculate_win_prob(self, dream_board, constraints, variables):
 		win_probs = np.ones_like(dream_board, dtype=np.float)
 		for position in variables:
 			if dream_board[position] < 0:
@@ -49,9 +49,6 @@ class GlobalSolver(CSPSolver):
 			new_constraint_val = dream_board[position]
 			# TODO, bug with known variables and set of unknown variables
 
-			new_constraint_vars -= safe_moves
-			new_constraint_val -= len(new_constraint_vars.intersection(known_mines))
-			new_constraint_vars -= known_mines
 			new_constraint_vars = new_constraint_vars.intersection(variables)
 			if new_constraint_val < 0:
 				raise InvalidConstraint
@@ -59,12 +56,12 @@ class GlobalSolver(CSPSolver):
 			# add new constraint knowledge
 			new_constraints = [[set([position]), 0], [new_constraint_vars, new_constraint_val]]
 			dream_constraints, dream_known_mines, dream_safe_moves = self.add_new_constraints(copy.deepcopy(constraints), new_constraints)
-			dream_variables = variables - dream_known_mines - dream_safe_moves
 			
-			if not dream_variables:
+			if not dream_constraints:
 				win_probs[position] = 1
 			else:
 				# recursively call to calculate win prob
+				dream_variables = variables - dream_known_mines - dream_safe_moves
 				win_sums = np.zeros_like(win_probs)
 				total = 0
 				board_values = np.zeros(self.board.shape, dtype=np.int8)
@@ -81,7 +78,7 @@ class GlobalSolver(CSPSolver):
 
 			dream_board = compute_adjacent_mines(board_values)
 			#pdb.set_trace()
-			win_prob = self._calculate_win_prob(dream_board, self.constraints, variables, set(), set())
+			win_prob = self._calculate_win_prob(dream_board, constraint_list, variables)
 			return win_sums + win_prob, total
 
 		# at each recursion, go through constraint list, select which variable to choose next
@@ -194,9 +191,9 @@ def test_win_prob():
 
 	_, test_probs = test_solver._probabilistic_guess()
 	print(test_probs)
-	true_probs = np.array([[0.35, 0.35],
-						   [0.   , 0.2],
-						   [0.35, 0.35]])
+	true_probs = np.array([[0.6, 0.6],
+						   [0. , 0.3],
+						   [0.6, 0.6]])
 	assert np.allclose(test_probs, true_probs)
 
 
@@ -215,9 +212,9 @@ def test_win_prob():
 
 	_, test_probs = test_solver._probabilistic_guess()
 	print(test_probs)
-	true_probs = np.array([[0., 0.24, 0.35550265],
-						   [0.24, 0.26708995, 0.35608466],
-						   [0.35550265, 0.35608466, 0.36888889]])
+	true_probs = np.array([[0.        , 0.66666667, 0.8       ]
+						   [0.66666667, 0.47619048, 0.8       ]
+						   [0.8       , 0.8       , 0.8       ]])
 	assert np.allclose(test_probs, true_probs)
 
 
