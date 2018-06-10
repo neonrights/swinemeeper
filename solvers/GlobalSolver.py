@@ -96,7 +96,7 @@ class GlobalSolver(CSPSolver):
 					new_constraint[0] -= constraint[0]
 
 					if not self.valid_constraint(new_constraint):
-						return sums, total
+						return win_sums, total
 					elif not new_constraint[0]:
 						delete_set.add(j)
 
@@ -122,7 +122,7 @@ class GlobalSolver(CSPSolver):
 					new_constraint[0] -= constraint[0]
 
 					if not self.valid_constraint(new_constraint):
-						return sums, total
+						return win_sums, total
 					elif not new_constraint[0]:
 						delete_set.add(j)
 
