@@ -16,7 +16,7 @@
 \setlength{\pdfpageheight}{11in}
 
 \pdfinfo{
-/Title (Optimal Algorithmic Solvers for Minesweeper)
+/Title (Optimal Solvers for Minesweeper)
 /Author (Nicholas Farn)
 /Keywords (Minesweeper)
 }
@@ -29,7 +29,7 @@
 \maketitle
 
 \begin{abstract}
-This is the abstract
+Minesweeper is a single player computer game enjoyed by millions around the world.  Despite its simple rules and objective, Minesweeper is deceptively complex and actually belongs to a set of problems known as NP-Complete.  This paper approaches Minesweeper from the viewpoint of a constraint-satisfaction problem and goes over several solvers that achieve optimal or near optimal win-rates.
 \end{abstract}
 
 \section{Introduction}
@@ -46,12 +46,12 @@ For human players, the goal of Minesweeper is to clear a board in the least amou
 
 \section{Relevance}
 % reference to Kaye, reference to Pederson
-While Minesweeper may seem like a simple game, it actually belongs a class of problems known as NP-Complete.  As shown by Richard Kaye, determining whether a current game of Minesweeper is ``consistent'' is NP-Complete, where a consistent game of Minesweeper is a game where there exists an assignment of mines to spaces that can give rise to the current state.  This was further improved upon by Kasper Pederson, who showed that Minesweeper consistency is NP-Complete when the dimension of the board played upon is greater than 1.  Furthermore, Kaye also demonstrated that Minesweeper is also Turing Complete.
+While Minesweeper may seem like a simple game, it actually belongs a class of problems known as NP-Complete.  As shown by Richard Kaye, determining whether a current game of Minesweeper is ``consistent'' is NP-Complete, where a consistent game of Minesweeper is a game where there exists an assignment of mines to spaces that can give rise to the current state.  This was further improved upon by Kasper Pederson, who showed that Minesweeper consistency is NP-Complete when the dimension of the board played upon is greater than 1.
 
 However, in a normal game of Minesweeper it is safe to assume the board one is given is consistent.  Despite this, Minesweeper is still an interesting and relevant game to the field of Computer Science.  As also shown by Kaye, Minesweeper can be reduced into a SAT, a well known NP-Complete problem.  Additionally, the research in this paper seems to indicate finding optimal solutions to Minesweeper is at least as hard as solving an ALL-SAT problem, yet another well known NP-Complete problem.
 
 \section{Prior Work}
-Prior work on optimally solving Minesweeper had been performed by a variety of people in the field from researchers to industry workers and students.  The earliest solver for Minesweeper appears to have been developed by John Ramsdell and implemented in freeware known as Programmer's Minesweeper (PGMS).  Unfortunately, PGMS appears to no longer be available online.  PGMS implemented two strategies to solve Minesweeper, single-point and equation strategy.  Both strategies are rather simplistic and perform well on beginner, but suffer terribly in performance on harder difficulties.
+Prior work on optimally solving Minesweeper seems to mostly be focused on approximating where to guess.  The earliest solver for Minesweeper appears to have been developed by John Ramsdell and implemented in freeware known as Programmer's Minesweeper (PGMS).  Unfortunately, PGMS appears to no longer be available online.  PGMS implemented two strategies to solve Minesweeper, single-point and equation strategy.  Both strategies are rather simplistic and perform well on beginner, but suffer terribly in performance on harder difficulties.
 
 Minesweeper was first modeled as a constraint-satisfaction problem (CSP) by Chris Studholme.  Studholme also discovered that when given a set of equally risky moves, it is generally more advantageous to uncover spaces in a corner, then on an edge, and finally in the middle.  Other strategies include limited search, which models Minesweeper as a CSP as well, but approximates values in order to reduce the computational cost of Studholme's strategy.  Finally, state of the art appears to be the CSP set solver developed in this paper.  Unfortunately, I discovered after development of the CSP set solver that it had been independently invented by Rapha\"el Collet who did not name the algorithm.
 
@@ -91,7 +91,7 @@ Simplifying and solving constraints in such a manner is equation strategy.  Equa
 \begin{algorithm}[t]
 \caption{General Minesweeper Solver}
 \label{alg:general_solver}
-\begin{algorithmic}
+\begin{algorithmic}[1]
 \STATE initialize set of covered spaces $C$ to all spaces
 \STATE initialize set of safe spaces $S$ to empty
 \STATE initialize set of known mines $M$ to empty
@@ -109,7 +109,7 @@ Simplifying and solving constraints in such a manner is equation strategy.  Equa
 		\IF{new constraint is now simple}
 			\STATE add variables to $S$ or $M$
 		\ENDIF
-		\STATE simplify remaining constraints with new knowledge
+		\STATE simplify remaining constraints
 	\ENDIF
 \ENDWHILE
 \end{algorithmic}
@@ -172,7 +172,7 @@ Unfortunately, neither CSP solver returns globally optimal guesses.  A good way 
 	\caption{\label{fig:optimal_state}}
 \end{subfigure}
 \label{fig:tie_breaker}
-\caption{The initial state in (\ref{fig:initial_state}) gives a uniform probability of $\frac25$ of revealing a mine for all spaces.  If the space revealed in (\ref{fig:suboptimal_state}) is not a mine it will be a two, resulting in a total probability of $\frac45$ of losing by revealing that space.  However if one reveals the space in (\ref{fig:optimal_state}) and it is not a mine, one is given a guaranteed win $\frac13$ of the time and a 50-50 win the remaining $\frac23$.  This leads to a total probability of $\frac35$ of losing.}
+\caption{The initial state in (\ref{fig:initial_state}) gives a uniform probability of $\frac25$ of revealing a mine for all spaces.  If the space revealed in (\ref{fig:suboptimal_state}) is not a mine it will be a two, resulting in a total probability of $\frac{7}{10}$ of losing by revealing that space.  However if one reveals the space in (\ref{fig:optimal_state}) and it is not a mine, one is given a guaranteed win $\frac13$ of the time and a 50-50 win the remaining $\frac23$.  This leads to a total probability of $\frac35$ of losing.}
 \end{figure}
 
 The pseudocode for an algorithm that is able to calculate globally optimal guesses can be viewed at algorithm (\ref{alg:optimal_guesser}).  Essentially, the algorithm calculates the probability of losing by revealing a given space by considering every potential future game given the currently revealed constraints.  Potential games can be computed through the use of the backtracking DFS algorithm used in the CSP solver.  However, the CSP set solver cannot be used since it calculates probabilities by eliminating variables of the same probability, a feature no longer nearly as present.  In this case the exact assignment of values to variables is needed to simulate potential games and how well they play out in favor for the solver.  However while simulating a potential game, if the solver is forced to guess in the potential game it must determine where it will guess which requires a recursive call to the already expensive guessing algorithm.
@@ -180,36 +180,41 @@ The pseudocode for an algorithm that is able to calculate globally optimal guess
 \begin{algorithm}[t]
 \caption{Optimal Guesser}
 \label{alg:optimal_guesser}
-\begin{algorithmic}
-\STATE initialize set of covered spaces $C$ to all spaces
-\STATE initialize set of safe spaces $S$ to empty
-\STATE initialize set of known mines $M$ to empty
-\WHILE{$C \neq \emptyset$}
-	\IF{$C \cup S \neq \emptyset$}
-		\STATE assign space in $C \cup S$ to uncover
-	\ELSE
-		\STATE use guessing algorithm
-	\ENDIF
-	\IF{uncovered space is not a mine}
-		\STATE remove space from $C$
-		\STATE add space to $S$
-		\STATE add new constraint from space
-		\STATE simplify constraint using $S$ and $M$
-		\IF{new constraint is now simple}
-			\STATE add variables to $S$ or $M$
+\begin{algorithmic}[1]
+\STATE initialize running average 
+\FOR{unique valid game state}
+	\FOR{covered space}
+		\STATE uncover space
+		\IF{space is mine}
+			\STATE win probability is 0
+		\ELSE
+			\STATE simplify and solve constraints
+			\IF{game is won}
+				\STATE win probability is 1
+			\ELSE
+				\STATE recursively compute win probability of remaining spaces
+				\STATE win probability is maximum of returned probabilities
+			\ENDIF
 		\ENDIF
-		\STATE simplify remaining constraints with new knowledge
-	\ENDIF
-\ENDWHILE
+	\ENDFOR
+	\STATE record win probability of space in running average
+\ENDFOR
+\RETURN win probabilities of all covered spaces
 \end{algorithmic}
 \end{algorithm}
 
-Worst of all, such an algorithm barely performs better the CSP set solver.  One is trading large amounts of performance in return for small improvements in the win rate of 1-2\%.
+Worst of all, such an algorithm barely performs better the CSP set solver.  One is trading large amounts of performance in return for small improvements in the win rate of 1-2\%.  While this solver can certainly be improved to prevent fewer recursive calls, it still has to consider every possible game given the current constraints.  The reason behind this is simple, suppose there is a globally optimal solver that does not need to consider every possible game state.  Then even on simple boards, if the game state it does not consider is the actual game state then it will return suboptimal results.  Therefore at best any globally optimal solver that considers probabilities has a lower bound on the time-complexity of $O(2^n)$.
 
-\subsection{Tie-Breaking CSP Solver}
-A variation of the CSP set solver was implemented to break ties when there are multiple spaces of minimum probability of being a mine.  The solver breaks ties by choosing spaces with the least number of adjacent squares whose values are currently unknown.  The logic behind this is based on prior work by Studholme, who demonstrated it is most advantageous to choose corners, then edges, then middles when a guess is needed early game.  The main reasoning by Studholme was that corners had far fewer adjacent spaces and had a greater likelihood of revealing a zero for a constraint leading to more information gain.  The natural extrapolation would then be to choose spaces with the least number of unknown adjacent spaces as they are most likely constrain their unknown neighbors to zero given a relatively similar probability.  This tie-breaking solver performs as well as state of the art and does generally better than a uniform guess between minimum probabilities.
+For algorithm (\ref{alg:optimal_guesser}), given $n$ variables, its performance in the best case is $O(n^32^n)$ per guess as it must generate $O(2^n)$ states and perform algorithm (\ref{alg:general_solver}) assuming the generated state on every covered space, an $O(n^3)$ operation.  This is assuming no guesses are needed and thus no recursive calls.  The worst-case time complexity is $O(\Pi_1^n n^32^n)$.
+
+\subsection{Tie-Breaking Solvers}
+A variation of the CSP set solver was implemented to break ties when there are multiple spaces of minimum probability of being a mine.  The solver breaks ties by choosing spaces with the least number of adjacent squares whose values are currently unknown.  The logic behind this is based on prior work by Studholme, who demonstrated it is most advantageous to choose corners, then edges, then middles when a guess is needed early game.  The main reasoning by Studholme was that corners had far fewer adjacent spaces and had a greater likelihood of revealing a zero for a constraint leading to more information gain.  The natural extrapolation would then be to choose spaces with the least number of unknown adjacent spaces as they are most likely constrain their unknown neighbors to zero given a relatively similar probability.
+
+This tie-breaking solver performs as well as state of the art and does generally better than a uniform guess between minimum probabilities.  It was largely developed in order to compare its performance against the globally optimal solver.  The globally optimal solver may also encounter tied probabilities.  However, since these probabilities are globally optimal, there is no benefit in breaking them.
 
 \section{Experimental Results}
+
+
 MAKE THESE!!!
 set solver vs global solver on every possible configuration of a small board
 performance comparison of CSP to others and state of the art
@@ -217,4 +222,9 @@ average guesses needed for set solver compared to mine density
 average time and nodes expanded per game between CSP and set solver
 
 \section{Conclusion}
+To my knowledge there has been no previous work on designing and characterizing a globally optimal solver for Minesweeper.  However, as the experimental results indicate, a globally optimal solver barely performs better than
+
+\bibliography{minesweeper}
+\bibliographystyle{aaai}
+\nocite{*}
 \end{document}

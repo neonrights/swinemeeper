@@ -5,3 +5,9 @@
 *.gif
 *.sty
 *.bst
+*.aux
+*.log
+*.xcf
+*.bbl
+*.blg
+*.synctex.gz
