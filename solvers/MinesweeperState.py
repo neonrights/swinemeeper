@@ -165,10 +165,10 @@ def compute_adjacent_mines(mine_positions):
 
 
 def draw_state(dest, mine_placement, covered):
-    state = MinesweeperState(mine_placement.shape, mine_placement.sum(), render=True)
-    state.adjacent_mines = compute_adjacent_mines(mine_placement)
+    state = MinesweeperState(mine_placement.shape, (mine_placement == -1).sum(), render=True)
+    state.adjacent_mines = mine_placement
     
-    for position in zip(*np.where(~covered)):
+    for position in zip(*np.where(~covered.T)):
         state._draw_cell(position)
 
     state.to_image(dest=dest)

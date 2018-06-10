@@ -65,7 +65,7 @@ class OverlapSolver(CCCSPSolver):
 				guess = min_pos[0]
 			else:
 				# generate rating for each position to break tie
-				guess = max([(pos, self._tie_breaker(pos, remaining_variables)) for pos in min_pos], key=lambda x : x[1])[0]
+				guess = min([(pos, self._tie_breaker(pos, remaining_variables)) for pos in min_pos], key=lambda x : x[1])[0]
 
 		return guess, probabilities
 

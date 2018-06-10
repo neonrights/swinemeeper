@@ -6,11 +6,12 @@ from multiprocessing import Pool
 from solvers import *
 
 # calculate performance
-def run_trial(trial_name, solver, trials, *args, **kwargs):
+def run_trial(trial_name, solver_class, trials, *args, **kwargs):
 	assert trials > 0
-	with open("data/%s.data.txt" % trial_name, 'a') as data_file:
-		times, guesses, wins = [], [], 0
-		solver = solver(MinesweeperState(*args, **kwargs))
+	times, guesses, wins = [], [], 0
+	solver = solver_class(MinesweeperState(*args, **kwargs))
+	
+	with open("data/%s/%s.data.txt" % (solver.name, trial_name), 'a') as data_file:
 		for i in range(trials):
 			board = MinesweeperState(*args, **kwargs)
 			solver.new_game(board)
@@ -53,23 +54,23 @@ def run_trial(trial_name, solver, trials, *args, **kwargs):
 	plt.savefig("images/charts/%s Times.png" % trial_name)
 
 
-def wrapper(job):
+def wrapper(job, solver_class=OverlapSolver):
 	if job == 0:
-		#run_trial("Beginner CCCSP", CCCSPSolver, 10000, (9, 9), 10, render=False)
-		run_trial("Intermediate CCCSP", CCCSPSolver, 1000, (16, 16), 40, start=True, render=False)
-		run_trial("Expert CCCSP", CCCSPSolver, 100, (16, 30), 99, start=True, render=False)
+		#run_trial("Beginner", solver_class, 10000, (9, 9), 10, render=False)
+		run_trial("Intermediate", solver_class, 1000, (16, 16), 40, start=True, render=False)
+		run_trial("Expert", solver_class, 100, (16, 30), 99, start=True, render=False)
 	elif job == 1:
-		#run_trial("Corner Beginner CCCSP", CCCSPSolver, 10000, (9, 9), 10, start=(0,0), render=False)
-		run_trial("Corner Intermediate CCCSP", CCCSPSolver, 1000, (16, 16), 40, start=(0,0), render=False)
-		run_trial("Corner Expert CCCSP", CCCSPSolver, 100, (16, 30), 99, start=(0,0), render=False)
+		#run_trial("Corner Beginner", solver_class, 10000, (9, 9), 10, start=(0,0), render=False)
+		run_trial("Corner Intermediate", solver_class, 1000, (16, 16), 40, start=(0,0), render=False)
+		run_trial("Corner Expert", solver_class, 100, (16, 30), 99, start=(0,0), render=False)
 	elif job == 2:
-		#run_trial("Edge Beginner CCCSP", CCCSPSolver, 10000, (9, 9), 10, start=(0,4), render=False)
-		run_trial("Edge Intermediate CCCSP", CCCSPSolver, 1000, (16, 16), 40, start=(0,7), render=False)
-		run_trial("Edge Expert CCCSP", CCCSPSolver, 100, (16, 30), 99, start=(0,14), render=False)
+		#run_trial("Edge Beginner", solver_class, 10000, (9, 9), 10, start=(0,4), render=False)
+		run_trial("Edge Intermediate", solver_class, 1000, (16, 16), 40, start=(0,7), render=False)
+		run_trial("Edge Expert", solver_class, 100, (16, 30), 99, start=(0,14), render=False)
 	elif job == 3:
-		#run_trial("Center Beginner CCCSP", CCCSPSolver, 10000, (9, 9), 10, start=(4,4), render=False)
-		run_trial("Center Intermediate CCCSP", CCCSPSolver, 1000, (16, 16), 40, start=(7,7), render=False)
-		run_trial("Center Expert CCCSP", CCCSPSolver, 100, (16, 30), 99, start=(7,14), render=False)
+		#run_trial("Center Beginner", solver_class, 10000, (9, 9), 10, start=(4,4), render=False)
+		run_trial("Center Intermediate", solver_class, 1000, (16, 16), 40, start=(7,7), render=False)
+		run_trial("Center Expert", solver_class, 100, (16, 30), 99, start=(7,14), render=False)
 
 
 if __name__ == '__main__':
@@ -82,6 +83,11 @@ if __name__ == '__main__':
 	if not os.path.exists('data'):
 		os.mkdir('data')
 
+	solver_class = OverlapSolver
+	name = OverlapSolver(MinesweeperState((5,5),1)).name
+	if not os.path.exists("data/%s" % name):
+		os.mkdir("data/%s" % name)
+	
 	print('name\ttrials\tguesses\ttime\twins')
 	pool = Pool(4)
 	pool.map(wrapper, range(4))
@@ -89,19 +95,16 @@ if __name__ == '__main__':
 	pool.join()
 
 	"""
-	run_trial("Beginner CCCSP", CCCSPSolver, 10000, (9, 9), 10, render=False)
-	run_trial("Intermediate CCCSP", CCCSPSolver, 1000, (16, 16), 40, render=False)
-	run_trial("Expert CCCSP", CCCSPSolver, 100, (16, 30), 99, render=False)
-
-	run_trial("Corner Beginner CCCSP", CCCSPSolver, 10000, (9, 9), 10, start=(0,0), render=False)
-	run_trial("Corner Intermediate CCCSP", CCCSPSolver, 1000, (16, 16), 40, start=(0,0), render=False)
-	run_trial("Corner Expert CCCSP", CCCSPSolver, 100, (16, 30), 99, start=(0,0), render=False)
-
-	run_trial("Edge Beginner CCCSP", CCCSPSolver, 10000, (9, 9), 10, start=(0,4), render=False)
-	run_trial("Edge Intermediate CCCSP", CCCSPSolver, 1000, (16, 16), 40, start=(0,7), render=False)
-	run_trial("Edge Expert CCCSP", CCCSPSolver, 100, (16, 30), 99, start=(0,14), render=False)
-
-	run_trial("Center Beginner CCCSP", CCCSPSolver, 10000, (9, 9), 10, start=(4,4), render=False)
-	run_trial("Center Intermediate CCCSP", CCCSPSolver, 1000, (16, 16), 40, start=(7,7), render=False)
-	run_trial("Center Expert CCCSP", CCCSPSolver, 100, (16, 30), 99, start=(7,14), render=False)
-	"""
+	run_trial("Beginner", solver_class, 10000, (9, 9), 10, render=False)
+	run_trial("Intermediate", solver_class, 1000, (16, 16), 40, start=True, render=False)
+	run_trial("Expert", solver_class, 100, (16, 30), 99, start=True, render=False)
+	run_trial("Corner Beginner", solver_class, 10000, (9, 9), 10, start=(0,0), render=False)
+	run_trial("Corner Intermediate", solver_class, 1000, (16, 16), 40, start=(0,0), render=False)
+	run_trial("Corner Expert", solver_class, 100, (16, 30), 99, start=(0,0), render=False)
+	run_trial("Edge Beginner", solver_class, 10000, (9, 9), 10, start=(0,4), render=False)
+	run_trial("Edge Intermediate", solver_class, 1000, (16, 16), 40, start=(0,7), render=False)
+	run_trial("Edge Expert", solver_class, 100, (16, 30), 99, start=(0,14), render=False)
+	run_trial("Center Beginner", solver_class, 10000, (9, 9), 10, start=(4,4), render=False)
+	run_trial("Center Intermediate", solver_class, 1000, (16, 16), 40, start=(7,7), render=False)
+	run_trial("Center Expert", solver_class, 100, (16, 30), 99, start=(7,14), render=False)
+	#"""
