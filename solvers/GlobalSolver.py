@@ -47,6 +47,7 @@ class GlobalSolver(CSPSolver):
 			# reveal position
 			new_constraint_vars = set(get_neighbors(position, self.board.shape))
 			new_constraint_val = dream_board[position]
+			# TODO, bug with known variables and set of unknown variables
 
 			new_constraint_vars -= safe_moves
 			new_constraint_val -= len(new_constraint_vars.intersection(known_mines))
@@ -55,77 +56,21 @@ class GlobalSolver(CSPSolver):
 			if new_constraint_val < 0:
 				raise InvalidConstraint
 
-			dream_known_mines = set(known_mines)
-			dream_safe_moves = set(safe_moves)
-
-			new_constraints = deque()
-			new_constraints.append([set([position]), 0]) # prune newly revealed space
-			if new_constraint_vars:
-				new_constraints.append([new_constraint_vars, new_constraint_val]) # prune
-			
-			# fully realize constraints
-			# continue while there are still newly formed constraints
-			dream_constraints = copy.deepcopy(constraints)
-			while new_constraints:
-				constraint_vars, constraint_val = new_constraints.popleft()
-				delete_set = set()
-				for i, constraint in enumerate(dream_constraints):
-					if constraint_val == 0:
-						# resolved constraint, all safe
-						constraint[0] -= constraint_vars
-					elif len(constraint_vars) == constraint_val:
-						# resolved constraint, all mines
-						constraint[1] -= len(constraint[0].intersection(constraint_vars))
-						constraint[0] -= constraint_vars
-					else:
-						# unresolved constraint
-						if constraint[0].issuperset(constraint_vars):
-							# new constraint is subset of old constraint
-							constraint[0] -= constraint_vars
-							constraint[1] -= constraint_val
-						elif constraint[0].issubset(constraint_vars):
-							# old constraint is subset of new constraint
-							new_vars = constraint_vars.difference(constraint[0])
-							new_val = constraint_val - constraint[1]
-							new_constraints.append([new_vars, new_val])
-							continue # skip remaining? must not add unaltered constraint
-
-					if not constraint[0]:
-						if constraint[1] != 0:
-							raise InvalidConstraint
-						delete_set.add(i) # empty constraint, remove
-
-					# if constraint is resolved, add new variables to list
-					if constraint[1] == 0:
-						new_constraints.append(constraint)
-						dream_safe_moves = dream_safe_moves.union(constraint[0])
-						delete_set.add(i)
-					elif len(constraint[0]) == constraint[1]:
-						new_constraints.append(constraint)
-						dream_known_mines = dream_known_mines.union(constraint[0])
-						delete_set.add(i)
-
-				for i in sorted(delete_set, reverse=True):
-					del dream_constraints[i]
-
-				if constraint_val == 0:
-					for move in constraint_vars:
-						if move in variables:
-							dream_safe_moves.add(move)
-				elif len(constraint_vars) == constraint_val:
-					dream_known_mines = dream_known_mines.union(constraint_vars)
-				elif constraint_vars:
-					dream_constraints.append([constraint_vars, constraint_val])
-			
+			# add new constraint knowledge
+			new_constraints = [[set([position]), 0], [new_constraint_vars, new_constraint_val]]
+			dream_constraints, dream_known_mines, dream_safe_moves = self.add_new_constraints(copy.deepcopy(constraints), new_constraints)
 			dream_variables = variables - dream_known_mines - dream_safe_moves
+			
 			if not dream_variables:
 				win_probs[position] = 1
 			else:
 				# recursively call to calculate win prob
-				var_win_prob = self._calculate_win_prob(dream_board, dream_constraints, dream_variables, dream_known_mines, dream_safe_moves)
-				win_prob = np.mean([var_win_prob[pos] for pos in dream_variables])
-				#pdb.set_trace()
-				win_probs[position] = win_prob
+				win_sums = np.zeros_like(win_probs)
+				total = 0
+				board_values = np.zeros(self.board.shape, dtype=np.int8)
+				win_sums, total = self._constraint_dfs(dream_constraints, win_sums, total, board_values, dream_variables)
+
+				win_probs[position] = float(np.max([win_sums[pos] for pos in dream_variables])) / total
 
 		return win_probs
 
@@ -133,9 +78,10 @@ class GlobalSolver(CSPSolver):
 	def _constraint_dfs(self, constraint_list, win_sums, total, board_values, variables):
 		if not constraint_list: # all constraints resolved
 			total += 1
-			adjacent_mines = compute_adjacent_mines(board_values)
-			win_prob = self._calculate_win_prob(adjacent_mines, self.constraints, variables, set(), set())
+
+			dream_board = compute_adjacent_mines(board_values)
 			#pdb.set_trace()
+			win_prob = self._calculate_win_prob(dream_board, self.constraints, variables, set(), set())
 			return win_sums + win_prob, total
 
 		# at each recursion, go through constraint list, select which variable to choose next
@@ -152,12 +98,8 @@ class GlobalSolver(CSPSolver):
 				for j, new_constraint in enumerate(new_constraint_list):
 					new_constraint[0] -= constraint[0]
 
-					if new_constraint[1] < 0: # invalid assignment
-						return win_sums, total
-					elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
-						return win_sums, total
-					elif len(constraint[0]) < constraint[1]:
-						return win_sums, total
+					if not self.valid_constraint(new_constraint):
+						return sums, total
 					elif not new_constraint[0]:
 						delete_set.add(j)
 
@@ -182,12 +124,8 @@ class GlobalSolver(CSPSolver):
 					new_constraint[1] -= len(constraint[0].intersection(new_constraint[0]))
 					new_constraint[0] -= constraint[0]
 
-					if new_constraint[1] < 0: # invalid assignment
-						return win_sums, total
-					elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
-						return win_sums, total
-					elif len(constraint[0]) < constraint[1]:
-						return win_sums, total
+					if not self.valid_constraint(new_constraint):
+						return sums, total
 					elif not new_constraint[0]:
 						delete_set.add(j)
 
@@ -219,11 +157,7 @@ class GlobalSolver(CSPSolver):
 						new_constraint[0].remove(chosen_var)
 						new_constraint[1] -= chosen_val
 
-					if new_constraint[1] < 0: # invalid assignment
-						raise InvalidConstraint
-					elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
-						raise InvalidConstraint
-					elif len(constraint[0]) < constraint[1]:
+					if not self.valid_constraint(new_constraint):
 						raise InvalidConstraint
 					elif not new_constraint[0]:
 						delete_set.add(i)
@@ -240,6 +174,7 @@ class GlobalSolver(CSPSolver):
 			win_sums, total = self._constraint_dfs(new_constraint_list, win_sums, total, new_board_values, variables)
 
 		return win_sums, total # backtrack, no valid options left
+
 
 @exception_debugger
 def test_win_prob():
