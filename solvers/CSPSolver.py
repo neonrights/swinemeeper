@@ -39,27 +39,25 @@ class CSPSolver(MinesweeperSolver):
 			self._add_constraint(start)
 
 
-	def _add_constraint(self, position):
-		# determine unknown neighbors
-		constraint_vars = set(get_neighbors(position, self.board.shape))
-		constraint_val = self.board.adjacent_mines[position]
+	def valid_constraint(self, constraint):
+		if constraint[1] < 0: # invalid assignment
+			return False
+		elif constraint[1] > 0 and not constraint[0]: # invalid assignment
+			return False
+		elif len(constraint[0]) < constraint[1]:
+			return False
+		else:
+			return True
 
-		# remove known mines from constraint, update constraint
-		constraint_val -= len(constraint_vars.intersection(self.known_mines))
-		constraint_vars -= self.known_mines
-		if constraint_val < 0:
-			raise InvalidConstraint
 
-		new_constraints = deque()
-		new_constraints.append([set([position]), 0]) # prune newly revealed space
-		if constraint_vars:
-			new_constraints.append([constraint_vars, constraint_val]) # prune
-		
-		# continue while there are still newly formed constraints
+	def add_new_constraints(self, constraint_list, new_constraints):
+		known_mines = set()
+		safe_moves = set()
+		new_constraints = deque(new_constraints)
 		while new_constraints:
 			constraint_vars, constraint_val = new_constraints.popleft()
 			delete_set = set()
-			for i, constraint in enumerate(self.constraints):
+			for i, constraint in enumerate(constraint_list):
 				if constraint_val == 0:
 					# resolved constraint, all safe
 					constraint[0] -= constraint_vars
@@ -88,25 +86,54 @@ class CSPSolver(MinesweeperSolver):
 				# if constraint is resolved, add new variables to list
 				if constraint[1] == 0:
 					new_constraints.append(constraint)
-					self.safe_moves = self.safe_moves.union(constraint[0])
+					safe_moves = safe_moves.union(constraint[0])
 					delete_set.add(i)
 				elif len(constraint[0]) == constraint[1]:
 					new_constraints.append(constraint)
-					self.known_mines = self.known_mines.union(constraint[0])
+					known_mines = known_mines.union(constraint[0])
 					delete_set.add(i)
 
 			for i in sorted(delete_set, reverse=True):
-				del self.constraints[i]
+				del constraint_list[i]
 
 			# add constraint if not resolved, otherwise add to known mines or safe moves
 			if constraint_val == 0:
 				for move in constraint_vars:
 					if self.board.covered[move]:
-						self.safe_moves.add(move)
+						safe_moves.add(move)
 			elif len(constraint_vars) == constraint_val:
-				self.known_mines = self.known_mines.union(constraint_vars)
+				known_mines = known_mines.union(constraint_vars)
 			elif constraint_vars:
-				self.constraints.append([constraint_vars, constraint_val])
+				constraint_list.append([constraint_vars, constraint_val])
+
+		return constraint_list, known_mines, safe_moves
+
+
+	def _add_constraint(self, position):
+		# determine unknown neighbors
+		constraint_vars = set()
+		constraint_val = self.board.adjacent_mines[position]
+		for i in [-1, 0, 1]:
+			for j in [-1, 0, 1]:
+				neighbor = (position[0] + i, position[1] + j)
+				if 0 <= neighbor[0] < self.board.covered.shape[0] and 0 <= neighbor[1] < self.board.covered.shape[1]:
+					if neighbor != position and self.board.covered[neighbor]:
+						constraint_vars.add(neighbor)
+
+
+		# remove known mines from constraint, update constraint
+		constraint_val -= len(constraint_vars.intersection(self.known_mines))
+		constraint_vars -= self.known_mines
+		if constraint_val < 0:
+			raise InvalidConstraint
+
+		new_constraints = [[set([position]), 0]] # prune newly revealed space
+		if constraint_vars:
+			new_constraints.append([constraint_vars, constraint_val]) # prune
+		
+		self.constraints, known_mines, safe_moves = self.add_new_constraints(self.constraints, new_constraints)
+		self.known_mines = self.known_mines.union(known_mines)
+		self.safe_moves = self.safe_moves.union(safe_moves)
 
 
 	def _get_disjoint_sets(self, variables):
@@ -194,11 +221,7 @@ class CSPSolver(MinesweeperSolver):
 				for j, new_constraint in enumerate(new_constraint_list):
 					new_constraint[0] -= constraint[0]
 
-					if new_constraint[1] < 0: # invalid assignment
-						return sums, total
-					elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
-						return sums, total
-					elif len(constraint[0]) < constraint[1]:
+					if not self.valid_constraint(new_constraint):
 						return sums, total
 					elif not new_constraint[0]:
 						delete_set.add(j)
@@ -222,11 +245,7 @@ class CSPSolver(MinesweeperSolver):
 					new_constraint[1] -= len(constraint[0].intersection(new_constraint[0]))
 					new_constraint[0] -= constraint[0]
 
-					if new_constraint[1] < 0: # invalid assignment
-						return sums, total
-					elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
-						return sums, total
-					elif len(constraint[0]) < constraint[1]:
+					if not self.valid_constraint(new_constraint):
 						return sums, total
 					elif not new_constraint[0]:
 						delete_set.add(j)
@@ -257,11 +276,7 @@ class CSPSolver(MinesweeperSolver):
 						new_constraint[0].remove(chosen_var)
 						new_constraint[1] -= chosen_val
 
-					if new_constraint[1] < 0: # invalid assignment
-						raise InvalidConstraint
-					elif new_constraint[1] > 0 and not new_constraint[0]: # invalid assignment
-						raise InvalidConstraint
-					elif len(constraint[0]) < constraint[1]:
+					if not self.valid_constraint(new_constraint):
 						raise InvalidConstraint
 					elif not new_constraint[0]:
 						delete_set.add(i)
