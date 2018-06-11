@@ -53,7 +53,7 @@ However, in a normal game of Minesweeper it is safe to assume the board one is g
 \section{Prior Work}
 Prior work on optimally solving Minesweeper seems to mostly be focused on approximating where to guess.  The earliest solver for Minesweeper appears to have been developed by John Ramsdell and implemented in freeware known as Programmer's Minesweeper (PGMS).  Unfortunately, PGMS appears to no longer be available online.  PGMS implemented two strategies to solve Minesweeper, single-point and equation strategy.  Both strategies are rather simplistic and perform well on beginner, but suffer terribly in performance on harder difficulties.
 
-Minesweeper was first modeled as a constraint-satisfaction problem (CSP) by Chris Studholme.  Studholme also discovered that when given a set of equally risky moves, it is generally more advantageous to uncover spaces in a corner, then on an edge, and finally in the middle.  Other strategies include limited search, which models Minesweeper as a CSP as well, but approximates values in order to reduce the computational cost of Studholme's strategy.  Finally, state of the art appears to be the CSP set solver developed in this paper.  Unfortunately, I discovered after development of the CSP set solver that it had been independently invented by Rapha\"el Collet who did not name the algorithm.
+Minesweeper was first modeled as a constraint-satisfaction problem (CSP) by Chris Studholme.  Studholme also discovered that when given a set of equally risky moves, it is generally more advantageous to uncover spaces in a corner, then on an edge, and finally in the middle.  Other strategies include limited search, which models Minesweeper as a CSP as well, but approximates values in order to reduce the computational cost of Studholme's strategy.  Unfortunately, I discovered after development of the CSP set solver that it had been independently invented by Rapha\"el Collet who did not name the algorithm.  State of the art goes to Buffet et al, who also modeled Minesweeper as a CSP and created an ``optimistic heuristic'' to break ties.  Buffet et al named their solver Heuristic CSP (HCSP).
 
 \section{Approaches}
 A natural way of modeling Minesweeper is as a CSP.  Each space can be seen as a boolean variable, with it taking on a value of 1 if it contains a mine, or 0 if it is empty.  Each revealed space constrains the sum of its neighbors to be equal to the number of adjacent mines, i.e. the number revealed when uncovering a space.  Since the number of mines initialized are known beforehand, an additional constraint can be applied that requires the sum of all spaces to be equal to the number of initialized mines.  Variables can be named following standard matrix notation.
@@ -213,16 +213,61 @@ A variation of the CSP set solver was implemented to break ties when there are m
 This tie-breaking solver performs as well as state of the art and does generally better than a uniform guess between minimum probabilities.  It was largely developed in order to compare its performance against the globally optimal solver.  The globally optimal solver may also encounter tied probabilities.  However, since these probabilities are globally optimal, there is no benefit in breaking them.
 
 \section{Experimental Results}
+In order to characterize the performance of the various solvers, I ran trials on all 3 difficulties for CSP set solver and tie-breaking.  These results are also compared to other solvers and can be viewed in table (\ref{tb:win_percent}).  The global solver was compared to a simple tie-breaking solver by running both on a small, 3x3 board for numerous trials.  These results can be viewed in table (\ref{tb:global_percent}).  Larger boards were attempted, but a sufficient number of trials was not reached in order to draw conclusive results.  Furthermore, a comparison of nodes generated over the course of a game was done between the basic CSP solver and CSP set solver in order to compare the average improvement between the two, table (\ref{tb:nodes}).  Generally, the mine count for smaller board was chosen to have a similar density as expert difficulty in order to encourage more guesses per game.%
 
+\begin{table}[h]
+\centering
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{|c|c|c|c|c|c|c|}
+\hline
+& Equation & Limited Search & CSP set solver & Tie-breaking & HCSP \\
+\hline
+Beginner & 71\% & 92\% & 89\% & 90\% & 89\% \\
+Intermediate & 36\% & 64\% & 74\% & 76\% & 74\% \\
+Expert & 26\% & 17\% & 31\% & 34\% & 38\% \\
+\hline
+\end{tabular}
+}
+\caption{Win percentage of various solvers over standard difficulty levels for at least 1000 games.}
+\label{tb:win_percent}
+\end{table}
 
-MAKE THESE!!!
-set solver vs global solver on every possible configuration of a small board
-performance comparison of CSP to others and state of the art
-average guesses needed for set solver compared to mine density
-average time and nodes expanded per game between CSP and set solver
+\begin{table}[h]
+\centering
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{|c|c|c|c|}
+\hline
+& CSP set solver & tie-breaking & Globally optimal\\
+\hline
+$3\times3$ with 2 mines & 77\% & 80\% & 82\% \\
+\hline
+\end{tabular}
+}
+\caption{Comparison of win rate over for at least 500 games.}
+\label{tb:global_percent}
+\end{table}
+
+\begin{table}[h]
+\centering
+\resizebox{0.8\columnwidth}{!}{
+\begin{tabular}{|c|c|c|}
+\hline
+& CSP solver & CSP set solver \\
+\hline
+$4 \times 4$ with 3 mines & 56.22 & 7.38 \\
+$5 \times 5$ with 5 mines & 3230.18 & 31.56 \\
+$6 \times 6$ with 7 mines & a & a \\
+$7 \times 7$ with 10 mines & a & a \\
+$8 \times 8$ with 13 mines & a & a \\
+\hline
+\end{tabular}
+}
+\caption{Comparison of nodes generated for a variety of board sizes.}
+\label{tb:nodes}
+\end{table}
 
 \section{Conclusion}
-To my knowledge there has been no previous work on designing and characterizing a globally optimal solver for Minesweeper.  However, as the experimental results indicate, a globally optimal solver barely performs better than
+To my knowledge there has been no previous work on designing and characterizing a globally optimal solver for Minesweeper.  However, as the experimental results indicate, a globally optimal solver barely performs better than the tie-breaking CSP set solver.  However, the global algorithm could potentially be significantly improved in future work as it exhibits many symmetries when computing probabilities.  Overall, it is interesting to see that the vast majority of moves made in Minesweeper are not guesses.  Even on the hardest difficulty, the tie-breaking CSP set solver would make approximately 7.4 guesses a game.  This drops drastically for easier difficulties with intermediate at 2.5 guesses and beginner around 1.1.  It was also surprising how much of an improvement the CSP set solver made over a basic CSP solver as it made possible playing all three difficulties with expert usually taking approximately 3 seconds.  Thus is in comparison to the CSP solver taking most of a day on some beginner level games.
 
 \bibliography{minesweeper}
 \bibliographystyle{aaai}
