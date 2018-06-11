@@ -22,7 +22,7 @@
 }
 
 \title{Optimal Solvers for Minesweeper}
-\author{Nicholas Farn\\ nfarn@cs.ucla.edu}
+\author{Nicholas Farn\\ UCLA Department of Computer Science \\ nfarn@cs.ucla.edu}
 
 
 \begin{document}
@@ -35,7 +35,7 @@ Minesweeper is a single player computer game enjoyed by millions around the worl
 \section{Introduction}
 Minesweeper is a single player game bundled with most Microsoft Windows operating systems.  It is played on an initially covered rectangular grid.  A set number of the spaces on the are secretly initialized to contain mines.  The goal of the game is to uncover all spaces on the grid that do not contain a mine, known as clearing the board.  If a mine is uncovered, the game ends immediately and the player loses.  If a space not containing a mine is uncovered, it displays the number of adjacent mines including diagonals.  Additionally, the first space uncovered in a game is always guaranteed to not be a mine.
 
-For human players, the goal of Minesweeper is to clear a board in the least amount of time possible.  Accordingly, most strategy guides for Minesweeper focus on tactics to improve click speed with less concern on winning.  From the perspective of a computer scientist, this is uninteresting.  One could imagine a simple algorithm that may win only 0.01\% of the time but is able to play a single game in a fraction of a second.  Thus research is instead focused on optimal play for a game of Minesweeper.  However a game of Minesweeper is not guaranteed to be deterministic, inevitably one is forced to guess.  Thus optimal play in a game of Minesweeper involves choosing the next space to uncover that has the least risk of losing given information currently provided by uncovered spaces.  Developing such algorithms that lead to optimal play is the crux of this paper.
+For human players, the goal of Minesweeper is to clear a board in the least amount of time possible.  Accordingly, most strategy guides for Minesweeper focus on tactics to improve click speed with less concern on winning.  From the perspective of a computer scientist, this is uninteresting.  One could imagine a simple algorithm that may win only 0.01\% of the time but is able to play a single game in a fraction of a second.  Thus research is instead focused on optimal play for a game of Minesweeper.  However, a game of Minesweeper is not guaranteed to be deterministic, inevitably one is forced to guess.  Thus optimal play in a game of Minesweeper involves choosing the next space to uncover that has the least risk of losing given information currently provided by uncovered spaces.  Developing such algorithms that lead to optimal play is the crux of this paper.
 
 \begin{figure}[t]
 \centering
@@ -92,7 +92,7 @@ Simplifying and solving constraints in such a manner is equation strategy.  Equa
 \caption{General Minesweeper Solver}
 \label{alg:general_solver}
 \begin{algorithmic}[1]
-\STATE initialize set of covered spaces $C$ to all spaces
+\STATE initialize set of covered spaces $C$ to contain all spaces
 \STATE initialize set of safe spaces $S$ to empty
 \STATE initialize set of known mines $M$ to empty
 \WHILE{$C \neq \emptyset$}
@@ -118,7 +118,7 @@ Simplifying and solving constraints in such a manner is equation strategy.  Equa
 Without taking into account the time complexity of the guessing algorithm, the time complexity of algorithm (\ref{alg:general_solver}) is $O(n^2)$ where $n$ is the number of variables.  This is because there can be at most $n+1$ constraints to consider if there are $n$ variables.
 
 \subsection{CSP Solver}
-The basic CSP algorithm chooses where to guess by uncovering an unknown space with the lowest probability of being a mine.  The probability of a space being a mine can be calculated by taking the average assigned value to a space over all unique assignments that satisfy the currently revealed constraints.  The probability calculated is the exact probability as there is a uniform probability of any of the unique assignments occurring since the initial probability of a space being a mine is uniform at the beginning of the game.  However finding all unique, valid assignments boils down into solving an ALL-SAT problem.  This can be done through the use of a backtracking depth first search.  However this is expensive as the worst-case time complexity of such an algorithm is $O(2^n)$ given $n$ variables.  The performance can be improved through the use of variable ordering and backjumping.  These can both be calculated when checking constraints to see if an assignment is valid and add no extra complexity when generating a node.  Variable ordering by itself significantly improves performance.
+The basic CSP algorithm chooses where to guess by uncovering an unknown space with the lowest probability of being a mine.  The probability of a space being a mine can be calculated by taking the average assigned value to a space over all unique assignments that satisfy the currently revealed constraints.  The probability calculated is the exact probability as there is a uniform probability of any of the unique assignments occurring since the initial probability of a space being a mine is uniform at the beginning of the game.  However, finding all unique valid assignments boils down into solving an ALL-SAT problem.  This can be done through the use of a backtracking depth first search.  However, this is expensive as the worst-case time complexity of such an algorithm is $O(2^n)$ given $n$ variables.  The performance can be improved through the use of variable ordering and backjumping.  These can both be calculated when checking constraints to see if an assignment is valid and add no extra complexity when generating a node.  Variable ordering by itself significantly improves performance.
 
 Performance can be even furthered improved by separating unknown variables into disjoint sets.  A single set would consist only of variables that only appear in a constraint with other variables in the set for all constraints.  For example suppose there exists three constraints at (\ref{eq:disjoint_sets}), none of the variables that appear in the first two constraints appear in the third.  Therefore two sets can be formed, $\{x_{1,1}, x_{1,2}, x_{1,3}\}$ and $\{x_{2,1}, x_{2,2}, x_{2,3}\}$.
 
@@ -132,7 +132,7 @@ x_{2,1} + x_{2,2} &+ x_{2,3} &= 2
 
 In terms of a constraint graph, variables in a set would only be able to travel to other variables within the set where edges form between variables that are in a constraint together.  Then the backtracking algorithm can be performed on each set separately, since variables in a single set cannot affect how constrained variables outside of their set are.  This greatly improves performance early in the game since revealed spaces are more likely to be far apart and resulting in little to no overlap.
 
-However despite these improvements, the basic CSP algorithm is only able to solve some beginner level games.  This is due to the fact that on average it only needs to make approximately 1.1 guesses a game.  Thus for a good number of games it does not even need to make a guess, or is given a single constraint that does not require a backtracking algorithm to solve.
+However, despite these improvements, the basic CSP algorithm is only able to solve some beginner level games.  This is due to the fact that on average it only needs to make approximately 1.1 guesses a game.  Thus for a good number of games it does not even need to make a guess, or is given a single constraint that does not require a backtracking algorithm to solve.
 
 \subsection{CSP Set Solver}
 The basic CSP algorithm can be vastly improved by forming a single variable equal to the sum of a set of variables.  The set of variables chosen to be summed into a single variable always appear together across all constraints.  In other words, they are all constrained by the same set of constraints and thus will have the same probability of being a mine.  For example, take the following two constraints at (\ref{eq:set_variables}).  Variables $x_{1,2}$ and $x_{1,3}$ appear together in both the first two constraints, thus they can be summed into a single ``set'' variable, $s = x_{1,2} + x_{1,3}$.
@@ -145,14 +145,14 @@ x_{1,2} &+ x_{1,3} &+ x_{2,1}&&= 2\\
 \end{aligned}
 \end{equation}
 
-Constraints can then be rewritten in terms of set variables reducing the number of variables needed to be considered when performing a backtracking DFS.  The probability of a space containing a mine can then be computed by dividing the expected assigned value to a set variable by the number of variables summed in the set variable.  However these new set variables are no longer boolean variables and can take on a potential of integer values from 0 to the number of variables summed in a single set variable.  
+Constraints can then be rewritten in terms of set variables reducing the number of variables needed to be considered when performing a backtracking DFS.  The probability of a space containing a mine can then be computed by dividing the expected assigned value to a set variable by the number of variables summed in the set variable.  However, these new set variables are no longer boolean variables and can take on a potential of integer values from 0 to the number of variables summed in a single set variable.  
 
 Despite the increased branching factor of the search, the reduction in search depth always makes forming set variables worth it.  Suppose $N$ nodes are generated in a run of a backtracking algorithm.  Let two variables be joined into a single set variable.  In the best case, all possible combinations of values can be assigned to the two removed variables.  Thus removing them results in a multiplicative reduction of 4 at best.  Since all assignments are valid between the two variables, the set variable can be assigned 0, 1, or 2 as values, resulting in a multiplicative increase of 3.  Overall this leads to an improvement of $\frac34 N$ nodes generated in the best case.  In general, forming a set variable which is the sum of $m$ variables results in a multiplicative reduction of at most $\frac{1}{2^m}\min(m+1,k)$ where $k$ is the number of remaining unknown mines.  In the worst case, no set variables can be formed, or the set variable is constrained to equal only 0 resulting in the exact same number of nodes generated.  Therefore the worst-case time complexity is still $O(2^n)$ where $n$ is the number of variables.
 
 In practice, although the maximum improvement is rarely achieved, set variables lead to vast improvements in performance.  Just like disjoint set, set variables are almost guaranteed to form early and even into mid-game.  By end-game, there are few enough variables to consider that an ordinary backtracking DFS does fine although small set variables do form.  The CSP set solver was able to solve all three difficulties of Minesweeper in reasonable time where the basic CSP solver was barely able to solve the first.  The win rate for both solvers are exactly the same since the exact same probabilities are computed by both guessing algorithms.
 
 \subsection{Globally Optimal Solver}
-Unfortunately, neither CSP solver returns globally optimal guesses.  A good way to see why this is so is to consider what happens when there are multiple spaces of minimum probability of being a mine.  Suppose we have the initial state in figure (\ref{fig:initial_state}).  There is only a single constraint which gives every space a uniform probability of $\frac25$ of being a mine.  Suppose the space chosen does not contain a mine, what is the information gained?  Choosing the space in figure (\ref{fig:suboptimal_state}) will always reveal a 2 leading to a 50-50 guess.  However if a corner is chosen instead like in figure (\ref{fig:optimal_state}), there is a $\frac13$ probability of the space revealing a 0 or 2 which would lead to a win without needing to guess.  Thus revealing the space in figure (\ref{fig:suboptimal_state}) will lead to a higher probability of losing in the long run.  Therefore an optimal solver for Minesweeper will not choose a space with the minimum probability of containing a mine, but the space that leads to the lowest probability of losing in the long run.  This also implies that the most optimal move will not necessarily also be a space with the lowest probability of being a mine.
+Unfortunately, neither CSP solver returns globally optimal guesses.  A good way to see why this is so is to consider what happens when there are multiple spaces of minimum probability of being a mine.  Suppose we have the initial state in figure (\ref{fig:initial_state}).  There is only a single constraint which gives every space a uniform probability of $\frac25$ of being a mine.  Suppose the space chosen does not contain a mine, what is the information gained?  Choosing the space in figure (\ref{fig:suboptimal_state}) will always reveal a 2 leading to a 50-50 guess.  However, if a corner is chosen instead like in figure (\ref{fig:optimal_state}), there is a $\frac13$ probability of the space revealing a 0 or 2 which would lead to a win without needing to guess.  Thus revealing the space in figure (\ref{fig:suboptimal_state}) will lead to a higher probability of losing in the long run.  Therefore an optimal solver for Minesweeper will not choose a space with the minimum probability of containing a mine, but the space that leads to the lowest probability of losing in the long run.  This also implies that the most optimal move will not necessarily also be a space with the lowest probability of being a mine.
 
 \begin{figure}[t]
 \centering
@@ -172,10 +172,10 @@ Unfortunately, neither CSP solver returns globally optimal guesses.  A good way 
 	\caption{\label{fig:optimal_state}}
 \end{subfigure}
 \label{fig:tie_breaker}
-\caption{The initial state in (\ref{fig:initial_state}) gives a uniform probability of $\frac25$ of revealing a mine for all spaces.  If the space revealed in (\ref{fig:suboptimal_state}) is not a mine it will be a two, resulting in a total probability of $\frac{7}{10}$ of losing by revealing that space.  However if one reveals the space in (\ref{fig:optimal_state}) and it is not a mine, one is given a guaranteed win $\frac13$ of the time and a 50-50 win the remaining $\frac23$.  This leads to a total probability of $\frac35$ of losing.}
+\caption{The initial state in (\ref{fig:initial_state}) gives a uniform probability of $\frac25$ of revealing a mine for all spaces.  If the space revealed in (\ref{fig:suboptimal_state}) is not a mine it will be a two, resulting in a total probability of $\frac{7}{10}$ of losing by revealing that space.  However, if one reveals the space in (\ref{fig:optimal_state}) and it is not a mine, one is given a guaranteed win $\frac13$ of the time and a 50-50 win the remaining $\frac23$.  This leads to a total probability of $\frac35$ of losing.}
 \end{figure}
 
-The pseudocode for an algorithm that is able to calculate globally optimal guesses can be viewed at algorithm (\ref{alg:optimal_guesser}).  Essentially, the algorithm calculates the probability of losing by revealing a given space by considering every potential future game given the currently revealed constraints.  Potential games can be computed through the use of the backtracking DFS algorithm used in the CSP solver.  However, the CSP set solver cannot be used since it calculates probabilities by eliminating variables of the same probability, a feature no longer nearly as present.  In this case the exact assignment of values to variables is needed to simulate potential games and how well they play out in favor for the solver.  However while simulating a potential game, if the solver is forced to guess in the potential game it must determine where it will guess which requires a recursive call to the already expensive guessing algorithm.
+The pseudocode for an algorithm that is able to calculate globally optimal guesses can be viewed at algorithm (\ref{alg:optimal_guesser}).  Essentially, the algorithm calculates the probability of losing by revealing a given space by considering every potential future game given the currently revealed constraints.  Potential games can be computed through the use of the backtracking DFS algorithm used in the CSP solver.  However, the CSP set solver cannot be used since it calculates probabilities by eliminating variables of the same probability, a feature no longer nearly as present.  In this case the exact assignment of values to variables is needed to simulate potential games and how well they play out in favor for the solver.  However, while simulating a potential game, if the solver is forced to guess in the potential game it must determine where it will guess which requires a recursive call to the already expensive guessing algorithm.
 
 \begin{algorithm}[t]
 \caption{Optimal Guesser}
@@ -255,10 +255,8 @@ $3\times3$ with 2 mines & 77\% & 80\% & 82\% \\
 & CSP solver & CSP set solver \\
 \hline
 $4 \times 4$ with 3 mines & 56.22 & 7.38 \\
-$5 \times 5$ with 5 mines & 3230.18 & 31.56 \\
-$6 \times 6$ with 7 mines & a & a \\
-$7 \times 7$ with 10 mines & a & a \\
-$8 \times 8$ with 13 mines & a & a \\
+$5 \times 5$ with 5 mines & 3,230.18 & 31.56 \\
+$6 \times 6$ with 7 mines & 607,889.64 & 84.44 \\
 \hline
 \end{tabular}
 }
