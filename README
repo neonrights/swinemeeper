@@ -5,7 +5,7 @@ For more information please read the paper available under `article\minesweeper.
 If you use this repository or paper please cite me :)
 
 ```bibtex
-@amisc{Farn2018
+@article{Farn2018
   author = {Farn, Nicholas},
   title = {Optimal Solvers for Minesweeper},
   url = {\url{https://github.com/neonrights/swinemeeper}},
